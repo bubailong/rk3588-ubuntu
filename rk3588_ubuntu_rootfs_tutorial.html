@@ -1,0 +1,1443 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RK3588 Ubuntu 22.04 RootFS 移植完整教程 — 基于正点原子 Buildroot SDK</title>
+<style>
+  :root {
+    --primary: #e65c00;
+    --primary-dark: #bf4500;
+    --accent: #ff8c42;
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --surface2: #222636;
+    --border: #2e3349;
+    --text: #e8eaf0;
+    --text-muted: #8892b0;
+    --text-dim: #5a6480;
+    --code-bg: #141720;
+    --code-border: #2a3055;
+    --success: #4caf82;
+    --warning: #ffb347;
+    --danger: #ff6b6b;
+    --info: #64b5f6;
+    --tip-bg: rgba(100,181,246,0.08);
+    --warn-bg: rgba(255,179,71,0.08);
+    --danger-bg: rgba(255,107,107,0.08);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.75;
+    font-size: 15px;
+  }
+  /* ===== HEADER ===== */
+  header {
+    background: linear-gradient(135deg, #1a0a00 0%, #2d1200 40%, #1a1d27 100%);
+    border-bottom: 2px solid var(--primary);
+    padding: 48px 0 36px;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+  }
+  header::before {
+    content: '';
+    position: absolute; inset: 0;
+    background: radial-gradient(ellipse at 50% 0%, rgba(230,92,0,0.18) 0%, transparent 60%);
+    pointer-events: none;
+  }
+  .chip-badge {
+    display: inline-block;
+    background: linear-gradient(135deg, var(--primary), #ff6a00);
+    color: #fff;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    padding: 4px 14px;
+    border-radius: 20px;
+    margin-bottom: 16px;
+  }
+  header h1 {
+    font-size: clamp(22px, 4vw, 38px);
+    font-weight: 800;
+    color: #fff;
+    letter-spacing: -0.5px;
+    margin-bottom: 10px;
+  }
+  header h1 span { color: var(--accent); }
+  header p.subtitle {
+    color: var(--text-muted);
+    font-size: 15px;
+    max-width: 620px;
+    margin: 0 auto;
+  }
+  .header-meta {
+    margin-top: 20px;
+    display: flex;
+    gap: 24px;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+  .meta-tag {
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 6px;
+    padding: 4px 12px;
+    font-size: 12px;
+    color: var(--text-muted);
+  }
+  .meta-tag strong { color: var(--accent); }
+  /* ===== LAYOUT ===== */
+  .container { max-width: 960px; margin: 0 auto; padding: 0 24px; }
+  /* ===== TOC ===== */
+  .toc-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-left: 4px solid var(--primary);
+    border-radius: 10px;
+    margin: 36px 0 32px;
+    padding: 24px 28px;
+  }
+  .toc-card h2 { font-size: 15px; color: var(--accent); margin-bottom: 14px; letter-spacing: 1px; text-transform: uppercase; }
+  .toc-list { list-style: none; display: grid; grid-template-columns: 1fr 1fr; gap: 4px 32px; }
+  @media (max-width: 600px) { .toc-list { grid-template-columns: 1fr; } }
+  .toc-list li a {
+    color: var(--text-muted);
+    text-decoration: none;
+    font-size: 13.5px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 3px 0;
+    transition: color 0.2s;
+  }
+  .toc-list li a:hover { color: var(--accent); }
+  .toc-num {
+    color: var(--primary);
+    font-weight: 700;
+    font-size: 12px;
+    min-width: 22px;
+  }
+  /* ===== SECTIONS ===== */
+  .section {
+    margin-bottom: 48px;
+  }
+  .section-header {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 24px;
+    padding-bottom: 14px;
+    border-bottom: 1px solid var(--border);
+  }
+  .step-num {
+    width: 42px; height: 42px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--primary), #ff6a00);
+    color: #fff;
+    font-weight: 800;
+    font-size: 18px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .section-header h2 {
+    font-size: 22px;
+    font-weight: 700;
+    color: #fff;
+  }
+  h3 {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--accent);
+    margin: 24px 0 10px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  h3::before {
+    content: '';
+    width: 4px; height: 16px;
+    background: var(--primary);
+    border-radius: 2px;
+    display: inline-block;
+  }
+  p { color: var(--text-muted); margin-bottom: 12px; }
+  /* ===== CODE BLOCKS ===== */
+  .code-block {
+    background: var(--code-bg);
+    border: 1px solid var(--code-border);
+    border-radius: 8px;
+    margin: 12px 0 20px;
+    overflow: hidden;
+  }
+  .code-label {
+    background: rgba(255,255,255,0.04);
+    border-bottom: 1px solid var(--code-border);
+    padding: 6px 14px;
+    font-size: 11px;
+    color: var(--text-dim);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    letter-spacing: 0.5px;
+  }
+  .code-label .lang { color: var(--primary); font-weight: 600; text-transform: uppercase; }
+  pre {
+    padding: 16px 18px;
+    overflow-x: auto;
+    font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+    font-size: 13px;
+    line-height: 1.6;
+    color: #c9d1e3;
+  }
+  pre .comment { color: #4a5568; font-style: italic; }
+  pre .cmd { color: #79c0ff; }
+  pre .string { color: #a5d6ff; }
+  pre .path { color: #ffa657; }
+  pre .flag { color: #d2a8ff; }
+  /* ===== FILE CONTENT ===== */
+  .file-block {
+    background: var(--code-bg);
+    border: 1px solid var(--code-border);
+    border-left: 3px solid var(--info);
+    border-radius: 8px;
+    margin: 12px 0 20px;
+    overflow: hidden;
+  }
+  .file-block .code-label .lang { color: var(--info); }
+  /* ===== CALLOUTS ===== */
+  .callout {
+    border-radius: 8px;
+    padding: 14px 18px;
+    margin: 16px 0;
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+    font-size: 13.5px;
+  }
+  .callout-icon { font-size: 18px; flex-shrink: 0; margin-top: 1px; }
+  .callout.tip { background: var(--tip-bg); border: 1px solid rgba(100,181,246,0.2); }
+  .callout.warn { background: var(--warn-bg); border: 1px solid rgba(255,179,71,0.25); }
+  .callout.danger { background: var(--danger-bg); border: 1px solid rgba(255,107,107,0.25); }
+  .callout.success { background: rgba(76,175,130,0.08); border: 1px solid rgba(76,175,130,0.2); }
+  .callout-content { color: var(--text-muted); }
+  .callout-content strong { color: var(--text); }
+  /* ===== TABLES ===== */
+  .table-wrap { overflow-x: auto; margin: 14px 0 22px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  thead tr { background: rgba(230,92,0,0.12); }
+  th { padding: 10px 14px; text-align: left; color: var(--accent); font-weight: 700; border-bottom: 2px solid var(--primary); white-space: nowrap; }
+  td { padding: 9px 14px; border-bottom: 1px solid var(--border); color: var(--text-muted); }
+  tr:hover td { background: rgba(255,255,255,0.02); }
+  td code, th code { background: rgba(255,255,255,0.08); padding: 1px 6px; border-radius: 3px; font-size: 12px; color: var(--info); }
+  /* ===== CARDS ===== */
+  .card-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin: 14px 0 20px; }
+  @media (max-width: 600px) { .card-grid { grid-template-columns: 1fr; } }
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px;
+  }
+  .card h4 { color: var(--text); font-size: 13px; margin-bottom: 6px; }
+  .card p { font-size: 12.5px; margin: 0; }
+  /* ===== STEP FLOW ===== */
+  .flow-list { list-style: none; position: relative; padding-left: 24px; }
+  .flow-list::before {
+    content: '';
+    position: absolute;
+    left: 8px; top: 10px; bottom: 10px;
+    width: 2px;
+    background: linear-gradient(to bottom, var(--primary), transparent);
+  }
+  .flow-list li {
+    position: relative;
+    padding: 6px 0 6px 20px;
+    color: var(--text-muted);
+    font-size: 13.5px;
+  }
+  .flow-list li::before {
+    content: '';
+    position: absolute;
+    left: -8px; top: 13px;
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--primary);
+    border: 2px solid var(--bg);
+  }
+  /* ===== SCRIPT BLOCK ===== */
+  .script-file {
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+    margin: 14px 0 20px;
+  }
+  .script-file-header {
+    background: var(--surface2);
+    padding: 10px 18px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    border-bottom: 1px solid var(--border);
+  }
+  .file-dot { width: 8px; height: 8px; border-radius: 50%; }
+  .script-file-header .filename { color: var(--accent); font-size: 13px; font-family: monospace; }
+  .script-file pre { background: var(--code-bg); border: none; border-radius: 0; }
+  /* ===== DIVIDER ===== */
+  hr { border: none; border-top: 1px solid var(--border); margin: 40px 0; }
+  /* ===== FOOTER ===== */
+  footer {
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    padding: 28px;
+    text-align: center;
+    color: var(--text-dim);
+    font-size: 12.5px;
+    margin-top: 60px;
+  }
+  footer a { color: var(--primary); text-decoration: none; }
+  /* ===== INLINE CODE ===== */
+  code { background: rgba(255,255,255,0.07); padding: 1px 6px; border-radius: 4px; font-size: 13px; color: #a5d6ff; font-family: monospace; }
+  /* ===== PROGRESS BAR ===== */
+  .progress-track {
+    display: flex;
+    gap: 6px;
+    margin: 20px 0 30px;
+    flex-wrap: wrap;
+  }
+  .progress-step {
+    flex: 1;
+    min-width: 80px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 8px 10px;
+    text-align: center;
+    font-size: 11px;
+    color: var(--text-dim);
+    position: relative;
+  }
+  .progress-step.active {
+    border-color: var(--primary);
+    color: var(--accent);
+    background: rgba(230,92,0,0.08);
+  }
+  .progress-step .sn { display: block; font-weight: 700; font-size: 14px; color: var(--primary); }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="container">
+    <div class="chip-badge">嵌入式系统移植教程</div>
+    <h1>RK3588 <span>Ubuntu 22.04</span> RootFS 移植完整教程</h1>
+    <p class="subtitle">以正点原子 Buildroot SDK 为基础，通过 Ubuntu-Base + QEMU chroot 构建 ARM64 根文件系统并集成进 SDK 完整烧录</p>
+    <div class="header-meta">
+      <span class="meta-tag">芯片 <strong>RK3588 / ATK-DLRK3588</strong></span>
+      <span class="meta-tag">系统 <strong>Ubuntu 22.04 LTS (Jammy)</strong></span>
+      <span class="meta-tag">SDK <strong>正点原子 Buildroot SDK</strong></span>
+      <span class="meta-tag">架构 <strong>AArch64 / ARM64</strong></span>
+    </div>
+  </div>
+</header>
+
+<div class="container">
+
+  <!-- TOC -->
+  <div class="toc-card">
+    <h2>📋 目录</h2>
+    <ul class="toc-list">
+      <li><a href="#s1"><span class="toc-num">01</span>前置条件与工具准备</a></li>
+      <li><a href="#s2"><span class="toc-num">02</span>获取并初始化正点原子 SDK</a></li>
+      <li><a href="#s3"><span class="toc-num">03</span>编译 Buildroot（获取内核/uboot）</a></li>
+      <li><a href="#s4"><span class="toc-num">04</span>构建 Ubuntu 22.04 根文件系统</a></li>
+      <li><a href="#s5"><span class="toc-num">05</span>chroot 内软件安装与系统配置</a></li>
+      <li><a href="#s6"><span class="toc-num">06</span>安装 Rockchip 硬件驱动与模块</a></li>
+      <li><a href="#s7"><span class="toc-num">07</span>打包 Ubuntu rootfs 镜像</a></li>
+      <li><a href="#s8"><span class="toc-num">08</span>集成到 SDK 并生成完整固件</a></li>
+      <li><a href="#s9"><span class="toc-num">09</span>烧录到开发板</a></li>
+      <li><a href="#s10"><span class="toc-num">10</span>首次启动与后续配置</a></li>
+      <li><a href="#s11"><span class="toc-num">11</span>常见问题排查</a></li>
+      <li><a href="#s12"><span class="toc-num">12</span>快速参考脚本汇总</a></li>
+    </ul>
+  </div>
+
+  <!-- 整体流程 -->
+  <div class="progress-track">
+    <div class="progress-step active"><span class="sn">①</span>环境准备</div>
+    <div class="progress-step active"><span class="sn">②</span>SDK 编译</div>
+    <div class="progress-step active"><span class="sn">③</span>制作 rootfs</div>
+    <div class="progress-step active"><span class="sn">④</span>软件配置</div>
+    <div class="progress-step active"><span class="sn">⑤</span>打包镜像</div>
+    <div class="progress-step active"><span class="sn">⑥</span>烧录验证</div>
+  </div>
+
+  <!-- 整体说明 -->
+  <div class="callout tip">
+    <span class="callout-icon">💡</span>
+    <div class="callout-content">
+      <strong>思路概述：</strong>正点原子 Buildroot SDK 本身已提供内核（kernel）、U-Boot 和设备树等全套 BSP。
+      我们的目标是：用 <strong>Ubuntu-Base</strong>（官方最小 ARM64 系统包）+ <strong>QEMU chroot</strong> 搭建一个完整的 Ubuntu 22.04 根文件系统，
+      再把它打包为 <code>rootfs.img</code>，替换 SDK 中 Buildroot 生成的 rootfs，最终通过 RKDevTool / upgrade_tool 烧录即可。
+    </div>
+  </div>
+
+  <hr>
+
+  <!-- ===================== SECTION 1 ===================== -->
+  <section class="section" id="s1">
+    <div class="section-header">
+      <div class="step-num">1</div>
+      <h2>前置条件与工具准备</h2>
+    </div>
+
+    <h3>宿主机环境要求</h3>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>项目</th><th>要求</th><th>说明</th></tr></thead>
+        <tbody>
+          <tr><td>操作系统</td><td>Ubuntu 20.04 / 22.04 x86_64</td><td>推荐 VMware / 物理机</td></tr>
+          <tr><td>磁盘空间</td><td>≥ 200 GB</td><td>SDK + 编译缓存占用大</td></tr>
+          <tr><td>内存</td><td>≥ 16 GB</td><td>编译期间消耗较大</td></tr>
+          <tr><td>CPU</td><td>≥ 4 核心</td><td>并行编译加速</td></tr>
+          <tr><td>网络</td><td>可访问国内镜像站</td><td>下载 Ubuntu-Base 等资源</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>安装编译依赖</h3>
+    <div class="code-block">
+      <div class="code-label"><span class="lang">bash</span><span>宿主机执行</span></div>
+      <pre>sudo apt update && sudo apt install -y \
+  git ssh make gcc g++ gcc-multilib g++-multilib \
+  libssl-dev liblz4-tool expect patchelf chrpath \
+  gawk texinfo diffstat binfmt-support \
+  qemu-user-static debootstrap \
+  live-build bison flex fakeroot cmake \
+  unzip device-tree-compiler ncurses-dev \
+  python3 python-is-python3 python-dev-is-python3 \
+  rsync curl wget vim lzop bc cpio \
+  lib32z1 lib32gcc-s1 lib32stdc++6</pre>
+    </div>
+
+    <div class="callout tip">
+      <span class="callout-icon">💡</span>
+      <div class="callout-content">
+        <strong>关键依赖说明：</strong><code>qemu-user-static</code> 是在 x86 宿主机上运行 ARM64 chroot 的核心工具；
+        <code>binfmt-support</code> 配合它让内核自动透明执行 aarch64 二进制。
+      </div>
+    </div>
+
+    <h3>验证 QEMU 安装</h3>
+    <div class="code-block">
+      <div class="code-label"><span class="lang">bash</span></div>
+      <pre><span class="comment"># 确认 qemu-aarch64-static 存在</span>
+ls /usr/bin/qemu-aarch64-static
+<span class="comment"># 确认 binfmt 已注册 aarch64</span>
+update-binfmts --display | grep aarch64</pre>
+    </div>
+  </section>
+
+  <!-- ===================== SECTION 2 ===================== -->
+  <section class="section" id="s2">
+    <div class="section-header">
+      <div class="step-num">2</div>
+      <h2>获取并初始化正点原子 SDK</h2>
+    </div>
+
+    <h3>下载 SDK</h3>
+    <p>正点原子 ATK-DLRK3588 的完整 SDK 通过官方资料包或百度云盘提供，通常为压缩包形式（如 <code>atk-dlrk3588-sdk-*.tar.bz2</code>）。</p>
+
+    <div class="code-block">
+      <div class="code-label"><span class="lang">bash</span></div>
+      <pre><span class="comment"># 解压 SDK（以实际文件名为准）</span>
+mkdir -p ~/rk3588_sdk
+tar -xf atk-dlrk3588-sdk-*.tar.bz2 -C ~/rk3588_sdk
+cd ~/rk3588_sdk
+ls</pre>
+    </div>
+
+    <h3>SDK 目录结构说明</h3>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>目录</th><th>作用</th></tr></thead>
+        <tbody>
+          <tr><td><code>buildroot/</code></td><td>Buildroot 根文件系统构建目录（我们将替换其输出）</td></tr>
+          <tr><td><code>kernel/</code></td><td>Linux 内核源码，包含 RK3588 设备树</td></tr>
+          <tr><td><code>u-boot/</code></td><td>U-Boot 引导程序</td></tr>
+          <tr><td><code>prebuilts/</code></td><td>预编译工具链（gcc-aarch64-linux-gnu 等）</td></tr>
+          <tr><td><code>tools/</code></td><td>烧录工具 upgrade_tool、mkimage 等</td></tr>
+          <tr><td><code>device/</code></td><td>开发板分区配置 parameter.txt 等</td></tr>
+          <tr><td><code>docs/</code></td><td>官方参考文档</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ===================== SECTION 3 ===================== -->
+  <section class="section" id="s3">
+    <div class="section-header">
+      <div class="step-num">3</div>
+      <h2>编译 Buildroot（获取内核/U-Boot/设备树）</h2>
+    </div>
+
+    <p>
+      即使我们要替换 rootfs，也需要先通过 SDK 正常编译一次，以获得可用的 <strong>内核镜像（boot.img）</strong>、
+      <strong>U-Boot（MiniLoaderAll.bin / uboot.img）</strong> 以及 <strong>交叉编译工具链</strong>。
+    </p>
+
+    <h3>全量编译（推荐首次执行）</h3>
+    <div class="code-block">
+      <div class="code-label"><span class="lang">bash</span></div>
+      <pre>cd ~/rk3588_sdk
+
+<span class="comment"># 初始化 Buildroot 配置（正点原子 ATK-DLRK3588 专用 defconfig）</span>
+cd buildroot
+make rockchip_atk_dlrk3588_defconfig
+
+<span class="comment"># 开始编译（-j$(nproc) 多核并行，首次耗时 1-3 小时）</span>
+make -j$(nproc) 2>&1 | tee build.log</pre>
+    </div>
+
+    <div class="callout warn">
+      <span class="callout-icon">⚠️</span>
+      <div class="callout-content">
+        <strong>编译提示：</strong>首次编译会自动下载工具链和源码（约 5-10 GB），请确保网络畅通并耐心等待。
+        如果下载失败，可手动将依赖包放入 <code>buildroot/dl/</code> 目录后重新编译。
+      </div>
+    </div>
+
+    <h3>或者：只编译内核和 U-Boot</h3>
+    <div class="code-block">
+      <div class="code-label"><span class="lang">bash</span></div>
+      <pre>cd ~/rk3588_sdk
+
+<span class="comment"># 编译 U-Boot</span>
+cd u-boot
+make CROSS_COMPILE=aarch64-linux-gnu- rk3588_defconfig
+make CROSS_COMPILE=aarch64-linux-gnu- -j$(nproc)
+
+<span class="comment"># 返回 SDK 根目录编译内核</span>
+cd ../kernel
+make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- \
+     rockchip_linux_defconfig
+make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- \
+     -j$(nproc) Image modules dtbs</pre>
+    </div>
+
+    <h3>编译结果位置</h3>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>文件</th><th>路径</th><th>用途</th></tr></thead>
+        <tbody>
+          <tr><td><code>MiniLoaderAll.bin</code></td><td><code>u-boot/</code></td><td>一级引导加载器</td></tr>
+          <tr><td><code>uboot.img</code></td><td><code>u-boot/</code></td><td>U-Boot 镜像</td></tr>
+          <tr><td><code>boot.img</code></td><td><code>buildroot/output/images/</code></td><td>内核+设备树打包镜像</td></tr>
+          <tr><td><code>parameter.txt</code></td><td><code>device/rockchip/rk3588/</code></td><td>分区表配置</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ===================== SECTION 4 ===================== -->
+  <section class="section" id="s4">
+    <div class="section-header">
+      <div class="step-num">4</div>
+      <h2>构建 Ubuntu 22.04 根文件系统</h2>
+    </div>
+
+    <h3>下载 Ubuntu-Base ARM64</h3>
+    <p>Ubuntu-Base 是官方提供的最小 ARM64 根文件系统，通常仅几十 MB，基于它可以快速搭建完整 Ubuntu 环境。</p>
+
+    <div class="code-block">
+      <div class="code-label"><span class="lang">bash</span></div>
+      <pre>mkdir -p ~/ubuntu_build && cd ~/ubuntu_build
+
+<span class="comment"># 从北京外国语大学镜像站下载（速度快，国内推荐）</span>
+wget https://mirrors.bfsu.edu.cn/ubuntu-cdimage/ubuntu-base/releases/22.04.2/release/ubuntu-base-22.04.2-base-arm64.tar.gz
+
+<span class="comment"># 也可从官方下载（较慢）</span>
+<span class="comment"># wget http://cdimage.ubuntu.com/ubuntu-base/releases/22.04/release/ubuntu-base-22.04.2-base-arm64.tar.gz</span>
+
+<span class="comment"># 创建根文件系统目录并解压</span>
+mkdir -p ubuntu_rootfs
+sudo tar -xpf ubuntu-base-22.04.2-base-arm64.tar.gz -C ubuntu_rootfs/
+ls ubuntu_rootfs/</pre>
+    </div>
+
+    <h3>配置网络 DNS</h3>
+    <div class="code-block">
+      <div class="code-label"><span class="lang">bash</span></div>
+      <pre><span class="comment"># -L 选项确保拷贝真实文件而非符号链接</span>
+sudo cp -L /etc/resolv.conf ubuntu_rootfs/etc/resolv.conf</pre>
+    </div>
+
+    <h3>配置 APT 软件源（使用国内镜像）</h3>
+    <div class="code-block">
+      <div class="code-label"><span class="lang">bash</span></div>
+      <pre>sudo tee ubuntu_rootfs/etc/apt/sources.list << 'EOF'
+# 北京外国语大学镜像站（ARM64 Ports 源）
+deb http://mirrors.bfsu.edu.cn/ubuntu-ports/ jammy main restricted universe multiverse
+deb http://mirrors.bfsu.edu.cn/ubuntu-ports/ jammy-updates main restricted universe multiverse
+deb http://mirrors.bfsu.edu.cn/ubuntu-ports/ jammy-backports main restricted universe multiverse
+deb http://ports.ubuntu.com/ubuntu-ports/ jammy-security main restricted universe multiverse
+EOF</pre>
+    </div>
+
+    <h3>复制 QEMU 静态二进制</h3>
+    <div class="code-block">
+      <div class="code-label"><span class="lang">bash</span></div>
+      <pre><span class="comment"># 这是 chroot 执行 ARM64 程序的关键步骤</span>
+sudo cp /usr/bin/qemu-aarch64-static ubuntu_rootfs/usr/bin/
+<span class="comment"># 验证</span>
+ls ubuntu_rootfs/usr/bin/qemu-aarch64-static</pre>
+    </div>
+
+    <h3>创建挂载/卸载脚本</h3>
+    <div class="script-file">
+      <div class="script-file-header">
+        <div class="file-dot" style="background:#ff5f56"></div>
+        <div class="file-dot" style="background:#ffbd2e"></div>
+        <div class="file-dot" style="background:#27c93f"></div>
+        <span class="filename">~/ubuntu_build/mount-rootfs.sh</span>
+      </div>
+      <pre>#!/bin/bash
+# Ubuntu rootfs 挂载/卸载脚本
+# 用法: sudo ./mount-rootfs.sh -m &lt;rootfs_dir&gt;  (挂载)
+#       sudo ./mount-rootfs.sh -u &lt;rootfs_dir&gt;  (卸载)
+
+mnt() {
+    ROOTFS=$1
+    echo "[+] Mounting virtual filesystems to ${ROOTFS}..."
+    sudo mount -t proc  /proc      ${ROOTFS}/proc
+    sudo mount -t sysfs /sys       ${ROOTFS}/sys
+    sudo mount -o bind  /dev       ${ROOTFS}/dev
+    sudo mount -o bind  /dev/pts   ${ROOTFS}/dev/pts
+    echo "[+] Done."
+}
+
+umnt() {
+    ROOTFS=$1
+    echo "[-] Unmounting virtual filesystems from ${ROOTFS}..."
+    sudo umount -l ${ROOTFS}/proc    2>/dev/null
+    sudo umount -l ${ROOTFS}/sys     2>/dev/null
+    sudo umount -l ${ROOTFS}/dev/pts 2>/dev/null
+    sudo umount -l ${ROOTFS}/dev     2>/dev/null
+    echo "[-] Done."
+}
+
+if   [ "$1" = "-m" ] && [ -n "$2" ]; then mnt "$2"
+elif [ "$1" = "-u" ] && [ -n "$2" ]; then umnt "$2"
+else
+    echo "Usage: $0 [-m|-u] &lt;rootfs_dir&gt;"
+    exit 1
+fi</pre>
+    </div>
+
+    <div class="code-block">
+      <div class="code-label"><span class="lang">bash</span></div>
+      <pre>chmod +x mount-rootfs.sh
+
+<span class="comment"># 挂载虚拟文件系统</span>
+sudo ./mount-rootfs.sh -m ubuntu_rootfs/
+
+<span class="comment"># 进入 chroot 环境（ARM64 on x86_64）</span>
+sudo chroot ubuntu_rootfs/ /bin/bash</pre>
+    </div>
+
+    <div class="callout success">
+      <span class="callout-icon">✅</span>
+      <div class="callout-content">
+        成功进入 chroot 后，你现在处于一个 ARM64 Ubuntu 22.04 的迷你系统中。
+        以下 <strong>第 5、6 节的所有命令均在 chroot 内部执行</strong>，直到明确说明退出为止。
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== SECTION 5 ===================== -->
+  <section class="section" id="s5">
+    <div class="section-header">
+      <div class="step-num">5</div>
+      <h2>chroot 内：软件安装与系统配置</h2>
+    </div>
+
+    <div class="callout danger">
+      <span class="callout-icon">🔴</span>
+      <div class="callout-content">
+        <strong>注意：以下命令均在 chroot 环境内执行！</strong>
+        命令提示符应为 <code>root@(none):/#</code> 或类似形式。
+      </div>
+    </div>
+
+    <h3>更新软件源并安装基础包</h3>
+    <div class="code-block">
+      <div class="code-label"><span class="lang">bash (chroot 内)</span></div>
+      <pre>apt update && apt upgrade -y
+
+<span class="comment"># 安装核心基础软件（网络、SSH、工具等）</span>
+apt install -y \
+    vim bash-completion \
+    net-tools iputils-ping ifupdown ethtool \
+    openssh-server rsync udev htop \
+    rsyslog curl wget sudo kmod \
+    apt-utils dialog nfs-common psmisc \
+    language-pack-en-base \
+    apt-transport-https ca-certificates \
+    systemd systemd-sysv dbus \
+    lsb-release gnupg2 software-properties-common</pre>
+    </div>
+
+    <h3>本地化配置</h3>
+    <div class="code-block">
+      <div class="code-label"><span class="lang">bash (chroot 内)</span></div>
+      <pre><span class="comment"># 生成英文 locale（避免乱码，后续可选装中文）</span>
+locale-gen en_US.UTF-8
+update-locale LANG=en_US.UTF-8
+
+<span class="comment"># 设置时区（中国标准时间）</span>
+ln -sf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime
+echo "Asia/Shanghai" > /etc/timezone
+dpkg-reconfigure -f noninteractive tzdata</pre>
+    </div>
+
+    <h3>创建用户与设置密码</h3>
+    <div class="code-block">
+      <div class="code-label"><span class="lang">bash (chroot 内)</span></div>
+      <pre><span class="comment"># 设置 root 密码（请替换为你的密码）</span>
+passwd root
+<span class="comment"># 输入：yourRootPassword</span>
+
+<span class="comment"># 创建普通用户（替换 ubuntu 为你的用户名）</span>
+adduser ubuntu
+<span class="comment"># 按提示输入密码和信息（其余可直接回车跳过）</span>
+
+<span class="comment"># 赋予 sudo 权限</span>
+usermod -aG sudo ubuntu
+echo "ubuntu ALL=(ALL:ALL) ALL" >> /etc/sudoers</pre>
+    </div>
+
+    <h3>配置主机名与 hosts</h3>
+    <div class="code-block">
+      <div class="code-label"><span class="lang">bash (chroot 内)</span></div>
+      <pre>echo "RK3588-Ubuntu" > /etc/hostname
+
+cat > /etc/hosts << 'EOF'
+127.0.0.1   localhost
+127.0.1.1   RK3588-Ubuntu
+::1         localhost ip6-localhost ip6-loopback
+ff02::1     ip6-allnodes
+ff02::2     ip6-allrouters
+EOF</pre>
+    </div>
+
+    <h3>配置网络接口（有线网络 DHCP）</h3>
+    <div class="code-block">
+      <div class="code-label"><span class="lang">bash (chroot 内)</span></div>
+      <pre><span class="comment"># 方式一：使用 /etc/network/interfaces（传统方式）</span>
+cat > /etc/network/interfaces.d/eth0 << 'EOF'
+auto eth0
+iface eth0 inet dhcp
+EOF
+
+cat > /etc/network/interfaces.d/eth1 << 'EOF'
+auto eth1
+iface eth1 inet dhcp
+EOF
+
+<span class="comment"># 方式二：使用 netplan（Ubuntu 22 推荐）</span>
+cat > /etc/netplan/01-netcfg.yaml << 'EOF'
+network:
+  version: 2
+  renderer: networkd
+  ethernets:
+    eth0:
+      dhcp4: true
+      optional: true
+    eth1:
+      dhcp4: true
+      optional: true
+EOF
+chmod 600 /etc/netplan/01-netcfg.yaml</pre>
+    </div>
+
+    <h3>配置 SSH 服务</h3>
+    <div class="code-block">
+      <div class="code-label"><span class="lang">bash (chroot 内)</span></div>
+      <pre><span class="comment"># 允许 root SSH 登录（调试用，生产环境不建议）</span>
+sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin yes/' /etc/ssh/sshd_config
+sed -i 's/#PasswordAuthentication yes/PasswordAuthentication yes/' /etc/ssh/sshd_config
+
+<span class="comment"># 使能 SSH 服务开机自启</span>
+systemctl enable ssh</pre>
+    </div>
+
+    <h3>安装桌面环境（可选）</h3>
+    <p>如需图形界面，选择以下任一方案。若仅需命令行则跳过此节。</p>
+
+    <div class="card-grid">
+      <div class="card">
+        <h4>🖥️ GNOME（官方默认，资源占用大）</h4>
+        <p>Ubuntu 官方桌面，功能完整，适合 4GB+ RAM</p>
+      </div>
+      <div class="card">
+        <h4>🪟 LXDE/XFCE（轻量，推荐）</h4>
+        <p>资源消耗低，嵌入式设备更流畅，适合 2GB RAM</p>
+      </div>
+    </div>
+
+    <div class="code-block">
+      <div class="code-label"><span class="lang">bash (chroot 内) — GNOME 桌面</span></div>
+      <pre><span class="comment"># 安装精简版 GNOME（去掉大量不必要组件）</span>
+apt install -y --no-install-recommends ubuntu-desktop gnome-tweaks
+<span class="comment"># 设置默认启动图形界面</span>
+systemctl set-default graphical.target</pre>
+    </div>
+
+    <div class="code-block">
+      <div class="code-label"><span class="lang">bash (chroot 内) — LXDE 轻量桌面（推荐）</span></div>
+      <pre>apt install -y lxde lightdm
+systemctl set-default graphical.target
+systemctl enable lightdm</pre>
+    </div>
+
+    <h3>禁用睡眠/休眠（嵌入式必备）</h3>
+    <div class="code-block">
+      <div class="code-label"><span class="lang">bash (chroot 内)</span></div>
+      <pre>systemctl mask sleep.target suspend.target hibernate.target hybrid-sleep.target</pre>
+    </div>
+
+    <h3>安装中文支持（可选）</h3>
+    <div class="code-block">
+      <div class="code-label"><span class="lang">bash (chroot 内)</span></div>
+      <pre>apt install -y language-pack-zh-hans fonts-wqy-zenhei fonts-wqy-microhei
+locale-gen zh_CN.UTF-8</pre>
+    </div>
+
+    <h3>清理缓存，减小镜像体积</h3>
+    <div class="code-block">
+      <div class="code-label"><span class="lang">bash (chroot 内)</span></div>
+      <pre>apt clean && apt autoclean
+rm -rf /var/lib/apt/lists/*
+rm -f /usr/bin/qemu-aarch64-static   <span class="comment"># 烧录到板子后不需要此文件</span></pre>
+    </div>
+
+    <h3>退出 chroot</h3>
+    <div class="code-block">
+      <div class="code-label"><span class="lang">bash (chroot 内)</span></div>
+      <pre>exit</pre>
+    </div>
+
+    <div class="code-block">
+      <div class="code-label"><span class="lang">bash (宿主机)</span></div>
+      <pre><span class="comment"># 卸载挂载点</span>
+cd ~/ubuntu_build
+sudo ./mount-rootfs.sh -u ubuntu_rootfs/</pre>
+    </div>
+  </section>
+
+  <!-- ===================== SECTION 6 ===================== -->
+  <section class="section" id="s6">
+    <div class="section-header">
+      <div class="step-num">6</div>
+      <h2>安装 Rockchip 硬件驱动与内核模块</h2>
+    </div>
+
+    <p>Ubuntu-Base 本身不含 RK3588 的硬件驱动，需要从 SDK 内核编译结果中复制内核模块到 rootfs。</p>
+
+    <h3>① 安装内核模块到 Ubuntu rootfs</h3>
+
+    <p>首先进入 SDK 目录，读取当前内核版本号：</p>
+    <div class="code-block">
+      <div class="code-label"><span class="lang">bash</span><span>宿主机执行</span></div>
+      <pre>cd ~/rk3588_sdk
+KVER=$(cat kernel/include/config/kernel.release)
+echo "内核版本: ${KVER}"</pre>
+    </div>
+
+    <p>将内核模块安装到 Ubuntu rootfs 目录（<code>INSTALL_MOD_PATH</code> 指定目标路径）：</p>
+    <div class="code-block">
+      <div class="code-label"><span class="lang">bash</span><span>宿主机执行</span></div>
+      <pre>make -C kernel ARCH=arm64 \
+     CROSS_COMPILE=aarch64-linux-gnu- \
+     INSTALL_MOD_PATH=~/ubuntu_build/ubuntu_rootfs \
+     modules_install</pre>
+    </div>
+
+    <p>确认模块已成功安装到 rootfs：</p>
+    <div class="code-block">
+      <div class="code-label"><span class="lang">bash</span><span>宿主机执行</span></div>
+      <pre>ls ~/ubuntu_build/ubuntu_rootfs/lib/modules/</pre>
+    </div>
+
+    <h3>② 复制硬件固件（firmware）</h3>
+
+    <p>先定义两个路径变量，方便后续操作：</p>
+    <div class="code-block">
+      <div class="code-label"><span class="lang">bash</span><span>宿主机执行</span></div>
+      <pre>BUILDROOT_TARGET=~/rk3588_sdk/buildroot/output/rockchip_atk_dlrk3588/target
+UBUNTU_ROOTFS=~/ubuntu_build/ubuntu_rootfs</pre>
+    </div>
+
+    <p>复制无线网卡、蓝牙等硬件固件文件：</p>
+    <div class="code-block">
+      <div class="code-label"><span class="lang">bash</span><span>宿主机执行</span></div>
+      <pre>sudo cp -r ${BUILDROOT_TARGET}/lib/firmware ${UBUNTU_ROOTFS}/lib/</pre>
+    </div>
+
+    <p>复制 Rockchip GPU 用户态驱动库（若需要图形界面则必须执行此步）：</p>
+    <div class="code-block">
+      <div class="code-label"><span class="lang">bash</span><span>宿主机执行 · 图形界面必需</span></div>
+      <pre>sudo cp -r ${BUILDROOT_TARGET}/usr/lib/aarch64-linux-gnu/libmali* \
+    ${UBUNTU_ROOTFS}/usr/lib/aarch64-linux-gnu/ 2>/dev/null || true</pre>
+    </div>
+
+    <h3>③ 配置 fstab（文件系统挂载表）</h3>
+
+    <p>将以下内容写入 Ubuntu rootfs 的 <code>/etc/fstab</code>，定义系统启动时的分区挂载规则：</p>
+    <div class="file-block">
+      <div class="code-label"><span class="lang">写入文件</span><span>~/ubuntu_build/ubuntu_rootfs/etc/fstab</span></div>
+      <pre>sudo tee ~/ubuntu_build/ubuntu_rootfs/etc/fstab &lt;&lt; 'EOF'
+/dev/root        /           ext4    rw,noatime            0      1
+devtmpfs         /dev        devtmpfs defaults,mode=0755   0      0
+proc             /proc       proc    defaults               0      0
+sysfs            /sys        sysfs   defaults               0      0
+tmpfs            /tmp        tmpfs   defaults               0      0
+tmpfs            /run        tmpfs   mode=0755,nosuid,nodev 0      0
+EOF</pre>
+    </div>
+
+    <h3>④ （可选）安装 Rockchip MPP 媒体处理库</h3>
+
+    <div class="callout tip">
+      <span class="callout-icon">💡</span>
+      <div class="callout-content">
+        <strong>MPP 说明：</strong>Rockchip MPP（Media Process Platform）是 RK3588 硬件编解码的核心库，若需播放 4K 视频或运行 AI 推理等功能，建议安装。可从正点原子 SDK 的 <code>buildroot/package/rockchip/rockchip-mpp/</code> 目录获取源码自行编译。
+      </div>
+    </div>
+
+    <p>重新进入 chroot 环境以安装 MPP 库（三条命令依次执行）：</p>
+    <div class="code-block">
+      <div class="code-label"><span class="lang">bash</span><span>宿主机执行 — 重新进入 chroot</span></div>
+      <pre>sudo cp /usr/bin/qemu-aarch64-static ~/ubuntu_build/ubuntu_rootfs/usr/bin/
+sudo ./mount-rootfs.sh -m ubuntu_rootfs/
+sudo chroot ubuntu_rootfs/ /bin/bash</pre>
+    </div>
+
+    <p>进入 chroot 后，选择以下任一方式安装 MPP：</p>
+
+    <p><strong>方式 1</strong>：从本地 <code>.deb</code> 包安装（推荐，从 SDK buildroot 输出目录提取）：</p>
+    <div class="code-block">
+      <div class="code-label"><span class="lang">bash</span><span>chroot 内执行</span></div>
+      <pre>dpkg -i /tmp/librockchip-mpp*.deb</pre>
+    </div>
+
+    <p><strong>方式 2</strong>：从 GitHub Releases 页面下载预编译包（需要网络访问 GitHub）：</p>
+    <div class="code-block">
+      <div class="code-label"><span class="lang">bash</span><span>chroot 内执行</span></div>
+      <pre>wget https://github.com/rockchip-linux/mpp/releases/latest -O /tmp/mpp_latest.html
+# 根据下载页面中的实际包名，替换下方 URL 后执行
+# wget https://github.com/rockchip-linux/mpp/releases/download/xxx/librockchip-mpp_xxx_arm64.deb
+# dpkg -i librockchip-mpp_xxx_arm64.deb</pre>
+    </div>
+
+    <p>安装完成后退出 chroot，并卸载挂载点：</p>
+    <div class="code-block">
+      <div class="code-label"><span class="lang">bash</span><span>chroot 内执行</span></div>
+      <pre>exit</pre>
+    </div>
+    <div class="code-block">
+      <div class="code-label"><span class="lang">bash</span><span>宿主机执行 — 退出后卸载</span></div>
+      <pre>cd ~/ubuntu_build
+sudo ./mount-rootfs.sh -u ubuntu_rootfs/</pre>
+    </div>
+
+  </section>
+
+  <!-- ===================== SECTION 7 ===================== -->
+  <section class="section" id="s7">
+    <div class="section-header">
+      <div class="step-num">7</div>
+      <h2>打包 Ubuntu rootfs 为 ext4 镜像</h2>
+    </div>
+
+    <h3>确认卸载所有挂载点</h3>
+    <div class="code-block">
+      <div class="code-label"><span class="lang">bash (宿主机)</span></div>
+      <pre>cd ~/ubuntu_build
+sudo ./mount-rootfs.sh -u ubuntu_rootfs/
+
+<span class="comment"># 确认无残留挂载</span>
+mount | grep ubuntu_rootfs</pre>
+    </div>
+
+    <h3>使用打包脚本制作 rootfs.img</h3>
+    <div class="script-file">
+      <div class="script-file-header">
+        <div class="file-dot" style="background:#ff5f56"></div>
+        <div class="file-dot" style="background:#ffbd2e"></div>
+        <div class="file-dot" style="background:#27c93f"></div>
+        <span class="filename">~/ubuntu_build/mk-ubuntu-rootfs.sh</span>
+      </div>
+      <pre>#!/bin/bash
+# 将 ubuntu_rootfs 目录打包为 rootfs.img (ext4)
+set -e
+
+ROOTFS_DIR="$(pwd)/ubuntu_rootfs"
+OUTPUT_IMG="$(pwd)/ubuntu-rootfs.img"
+# 镜像大小（单位 MB）：命令行系统约 2GB，含桌面约 8GB
+IMG_SIZE_MB=8192
+
+echo "===================================="
+echo " RK3588 Ubuntu rootfs 打包脚本"
+echo "===================================="
+echo " 源目录: ${ROOTFS_DIR}"
+echo " 输出:   ${OUTPUT_IMG}"
+echo " 大小:   ${IMG_SIZE_MB} MB"
+echo "===================================="
+
+# 检查 qemu-aarch64-static 是否已删除
+if [ -f "${ROOTFS_DIR}/usr/bin/qemu-aarch64-static" ]; then
+    echo "[!] 发现 qemu-aarch64-static，正在删除..."
+    sudo rm -f "${ROOTFS_DIR}/usr/bin/qemu-aarch64-static"
+fi
+
+# 步骤1：创建空镜像文件
+echo "[1/4] 创建 ${IMG_SIZE_MB}MB 空镜像..."
+dd if=/dev/zero of="${OUTPUT_IMG}" bs=1M count=${IMG_SIZE_MB} status=progress
+
+# 步骤2：格式化为 ext4
+echo "[2/4] 格式化为 ext4..."
+mkfs.ext4 -L "ubuntu-rootfs" "${OUTPUT_IMG}"
+
+# 步骤3：挂载并复制文件
+echo "[3/4] 复制根文件系统..."
+MOUNT_POINT=$(mktemp -d)
+sudo mount -t ext4 "${OUTPUT_IMG}" "${MOUNT_POINT}"
+sudo cp -a "${ROOTFS_DIR}/." "${MOUNT_POINT}/"
+sudo umount "${MOUNT_POINT}"
+rmdir "${MOUNT_POINT}"
+
+# 步骤4：压缩空间（e2fsck + resize2fs）
+echo "[4/4] 压缩镜像（可选）..."
+e2fsck -p -f "${OUTPUT_IMG}" || true
+resize2fs -M "${OUTPUT_IMG}"
+
+echo ""
+echo "[✓] 完成！输出文件: ${OUTPUT_IMG}"
+echo "    大小: $(du -sh ${OUTPUT_IMG} | cut -f1)"</pre>
+    </div>
+
+    <div class="code-block">
+      <div class="code-label"><span class="lang">bash (宿主机)</span></div>
+      <pre">chmod +x mk-ubuntu-rootfs.sh
+
+<span class="comment"># 执行打包（需要 root 权限）</span>
+sudo ./mk-ubuntu-rootfs.sh
+
+<span class="comment"># 完成后查看输出</span>
+ls -lh ubuntu-rootfs.img</pre>
+    </div>
+
+    <div class="callout tip">
+      <span class="callout-icon">💡</span>
+      <div class="callout-content">
+        <strong>镜像大小建议：</strong>
+        <ul style="list-style:disc;padding-left:20px;margin-top:8px;font-size:13px;">
+          <li>命令行系统（无桌面）：<code>IMG_SIZE_MB=2048</code> (2GB)</li>
+          <li>LXDE 轻量桌面：<code>IMG_SIZE_MB=5120</code> (5GB)</li>
+          <li>GNOME 完整桌面：<code>IMG_SIZE_MB=8192</code> (8GB)</li>
+        </ul>
+        注意：分区大小不能超过 eMMC 实际容量！ATK-DLRK3588 默认 eMMC 为 16GB。
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== SECTION 8 ===================== -->
+  <section class="section" id="s8">
+    <div class="section-header">
+      <div class="step-num">8</div>
+      <h2>集成到 SDK 并调整分区表</h2>
+    </div>
+
+    <h3>修改 parameter.txt 分区表</h3>
+    <p>
+      Ubuntu 根文件系统比 Buildroot 大很多，需要扩大 <code>rootfs</code> 分区。
+      原始分区表可能将 rootfs 限制在 4~8 GB，建议改为自动扩展（<code>:grow</code>）。
+    </p>
+
+    <div class="code-block">
+      <div class="code-label"><span class="lang">bash (宿主机)</span></div>
+      <pre">cat ~/rk3588_sdk/device/rockchip/rk3588/parameter.txt</pre>
+    </div>
+
+    <p>找到 <code>mtdparts</code> 行，将 rootfs 分区修改为使用剩余全部空间：</p>
+
+    <div class="file-block">
+      <div class="code-label"><span class="lang">parameter.txt — 修改后示例</span></div>
+      <pre">FIRMWARE_VER: 11.0
+MACHINE_MODEL: RK3588
+MACHINE_ID: 007
+MANUFACTURER: RK3588
+MAGIC: 0x5041524B
+ATAG: 0x00200800
+MACHINE: 3588
+CHECK_MASK: 0x80
+PWR_HLD: 0,0,A,0,1
+TYPE: GPT
+CMDLINE: mtdparts=:0x00002000@0x00004000(uboot),\
+0x00002000@0x00006000(misc),\
+0x00020000@0x00008000(boot),\
+0x00040000@0x00028000(recovery),\
+-@0x00068000(rootfs:grow)
+uuid:rootfs=614e0000-0000-4b53-8000-1d28000054a9</pre>
+    </div>
+
+    <div class="callout warn">
+      <span class="callout-icon">⚠️</span>
+      <div class="callout-content">
+        <strong>注意：</strong>修改 <code>parameter.txt</code> 时，<strong>不要修改 uuid 行</strong>（包括 <code>uuid:rootfs=</code> 后的值），否则系统将找不到 rootfs 分区！
+      </div>
+    </div>
+
+    <h3>替换 rootfs 镜像</h3>
+    <div class="code-block">
+      <div class="code-label"><span class="lang">bash (宿主机)</span></div>
+      <pre"><span class="comment"># 复制 Ubuntu rootfs 镜像到 SDK 的 images 目录</span>
+cp ~/ubuntu_build/ubuntu-rootfs.img \
+   ~/rk3588_sdk/buildroot/output/images/rootfs.img
+
+<span class="comment"># 确认文件存在</span>
+ls -lh ~/rk3588_sdk/buildroot/output/images/rootfs.img</pre>
+    </div>
+
+    <h3>（可选）使用 SDK 脚本重新打包固件</h3>
+    <div class="code-block">
+      <div class="code-label"><span class="lang">bash (宿主机)</span></div>
+      <pre">cd ~/rk3588_sdk
+
+<span class="comment"># 如果有 mkfirmware.sh 一键打包脚本</span>
+./mkfirmware.sh 2>/dev/null || true
+
+<span class="comment"># 查看最终固件输出</span>
+ls -lh rockdev/ 2>/dev/null || ls -lh buildroot/output/images/</pre>
+    </div>
+  </section>
+
+  <!-- ===================== SECTION 9 ===================== -->
+  <section class="section" id="s9">
+    <div class="section-header">
+      <div class="step-num">9</div>
+      <h2>烧录到开发板</h2>
+    </div>
+
+    <div class="card-grid">
+      <div class="card">
+        <h4>🖥️ Windows 烧录：RKDevTool</h4>
+        <p>正点原子提供的 Windows 图形化烧录工具，操作直观，适合初学者</p>
+      </div>
+      <div class="card">
+        <h4>🐧 Linux 烧录：upgrade_tool</h4>
+        <p>命令行工具，适合脚本化批量烧录，推荐在虚拟机中使用</p>
+      </div>
+    </div>
+
+    <h3>方式 A：使用 RKDevTool（Windows）</h3>
+    <ul class="flow-list">
+      <li>安装 Rockchip USB 驱动（正点原子资料包中提供 DriverAssistant）</li>
+      <li>开发板断电，按住 RECOVERY 按键后上电，或短接 Maskrom 焊盘进入 Maskrom 模式</li>
+      <li>打开 RKDevTool，确认设备列表中显示 "发现一个MASKROM设备"</li>
+      <li>在地址表中依次配置各镜像路径（见下表）</li>
+      <li>点击 "执行" 开始烧录，等待进度条完成</li>
+    </ul>
+
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>分区名</th><th>镜像文件</th><th>来源目录</th></tr></thead>
+        <tbody>
+          <tr><td>Loader</td><td><code>MiniLoaderAll.bin</code></td><td><code>u-boot/</code></td></tr>
+          <tr><td>Parameter</td><td><code>parameter.txt</code></td><td><code>device/rockchip/rk3588/</code></td></tr>
+          <tr><td>uboot</td><td><code>uboot.img</code></td><td><code>u-boot/</code></td></tr>
+          <tr><td>misc</td><td><code>misc.img</code></td><td><code>buildroot/output/images/</code></td></tr>
+          <tr><td>boot</td><td><code>boot.img</code></td><td><code>buildroot/output/images/</code></td></tr>
+          <tr><td>recovery</td><td><code>recovery.img</code></td><td><code>buildroot/output/images/</code></td></tr>
+          <tr><td>rootfs</td><td><code>ubuntu-rootfs.img</code></td><td><code>~/ubuntu_build/</code></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>方式 B：使用 upgrade_tool（Linux 命令行）</h3>
+    <div class="code-block">
+      <div class="code-label"><span class="lang">bash (宿主机)</span></div>
+      <pre">cd ~/rk3588_sdk/tools
+
+<span class="comment"># 确认工具可执行</span>
+chmod +x upgrade_tool
+
+<span class="comment"># 1. 检查设备是否被识别（开发板需处于 Loader/Maskrom 模式）</span>
+sudo ./upgrade_tool LD
+
+<span class="comment"># 2. 烧写 Loader</span>
+sudo ./upgrade_tool UL u-boot/MiniLoaderAll.bin -noreset
+
+<span class="comment"># 3. 烧写分区表</span>
+sudo ./upgrade_tool DI -p device/rockchip/rk3588/parameter.txt
+
+<span class="comment"># 4. 依次烧写各分区镜像</span>
+sudo ./upgrade_tool DI -uboot     u-boot/uboot.img
+sudo ./upgrade_tool DI -misc      buildroot/output/images/misc.img
+sudo ./upgrade_tool DI -boot      buildroot/output/images/boot.img
+sudo ./upgrade_tool DI -recovery  buildroot/output/images/recovery.img
+sudo ./upgrade_tool DI -rootfs    ~/ubuntu_build/ubuntu-rootfs.img
+
+<span class="comment"># 5. 重启开发板</span>
+sudo ./upgrade_tool RD</pre>
+    </div>
+
+    <div class="callout danger">
+      <span class="callout-icon">🔴</span>
+      <div class="callout-content">
+        <strong>重要：</strong>烧写顺序不可颠倒，必须先烧 Loader 再烧 parameter（分区表），然后才能烧写各分区镜像。
+        顺序错误或镜像不匹配可能导致开发板无法启动，需重新进入 Maskrom 模式重刷。
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== SECTION 10 ===================== -->
+  <section class="section" id="s10">
+    <div class="section-header">
+      <div class="step-num">10</div>
+      <h2>首次启动与后续配置</h2>
+    </div>
+
+    <h3>开机步骤</h3>
+    <ul class="flow-list">
+      <li>烧录完成后重新上电，开发板自动进入 Ubuntu 22.04</li>
+      <li>通过串口（波特率 1500000）或 HDMI 显示器观察启动日志</li>
+      <li>等待 Ubuntu 启动完成，出现登录提示</li>
+      <li>使用之前设置的 <code>ubuntu</code> 用户或 <code>root</code> 登录</li>
+    </ul>
+
+    <h3>扩容根分区（重要！）</h3>
+    <p>由于我们使用 <code>:grow</code> 参数，rootfs 分区会被分配到全部剩余空间，但文件系统本身还是打包时的大小，需要手动扩容：</p>
+
+    <div class="code-block">
+      <div class="code-label"><span class="lang">bash (开发板上执行)</span></div>
+      <pre"><span class="comment"># 查看当前磁盘分区状态</span>
+lsblk
+df -h
+
+<span class="comment"># 确认根分区设备名（通常是 /dev/mmcblk0p5 或 /dev/mmcblk1p5）</span>
+ROOTDEV=$(findmnt -n -o SOURCE /)
+echo "根分区设备: ${ROOTDEV}"
+
+<span class="comment"># 扩展文件系统到分区最大容量</span>
+sudo resize2fs ${ROOTDEV}
+
+<span class="comment"># 验证扩容结果</span>
+df -h /</pre>
+    </div>
+
+    <h3>更新系统</h3>
+    <div class="code-block">
+      <div class="code-label"><span class="lang">bash (开发板上执行)</span></div>
+      <pre">sudo apt update && sudo apt upgrade -y</pre>
+    </div>
+
+    <h3>网络管理（NetworkManager）</h3>
+    <div class="code-block">
+      <div class="code-label"><span class="lang">bash (开发板上执行)</span></div>
+      <pre"><span class="comment"># 使 NetworkManager 接管有线网络</span>
+sudo tee /usr/lib/NetworkManager/conf.d/10-globally-managed-devices.conf << 'EOF'
+[keyfile]
+unmanaged-devices=*,except:type:wifi,except:type:gsm,except:type:cdma,except:type:ethernet
+EOF
+
+sudo systemctl restart NetworkManager
+nmcli dev status</pre>
+    </div>
+
+    <h3>串口登录配置（无显示器调试）</h3>
+    <div class="code-block">
+      <div class="code-label"><span class="lang">bash (开发板上执行)</span></div>
+      <pre"><span class="comment"># 使能串口 getty（调试串口通常为 ttyS2 或 ttyFIQ0）</span>
+sudo systemctl enable serial-getty@ttyS2.service
+sudo systemctl start  serial-getty@ttyS2.service</pre>
+    </div>
+  </section>
+
+  <!-- ===================== SECTION 11 ===================== -->
+  <section class="section" id="s11">
+    <div class="section-header">
+      <div class="step-num">11</div>
+      <h2>常见问题排查</h2>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>现象</th><th>可能原因</th><th>解决方案</th></tr></thead>
+        <tbody>
+          <tr>
+            <td>开机黑屏，无串口输出</td>
+            <td>Loader 或 U-Boot 烧录失败</td>
+            <td>重进 Maskrom 模式，重新烧录 MiniLoaderAll.bin 和 uboot.img</td>
+          </tr>
+          <tr>
+            <td>内核启动后无法挂载 rootfs</td>
+            <td>rootfs.img 格式错误或分区表不匹配</td>
+            <td>检查 parameter.txt UUID 是否与 fstab 一致；重新打包 rootfs</td>
+          </tr>
+          <tr>
+            <td>系统启动后磁盘空间不足</td>
+            <td>未执行 resize2fs</td>
+            <td>执行 <code>sudo resize2fs /dev/mmcblk0p5</code></td>
+          </tr>
+          <tr>
+            <td>网络无法连接</td>
+            <td>网卡驱动缺失或 NetworkManager 未管理</td>
+            <td>检查 <code>ip link</code>；重配 NetworkManager conf</td>
+          </tr>
+          <tr>
+            <td>图形界面黑屏</td>
+            <td>GPU 驱动未安装 / 显示管理器配置错</td>
+            <td>从 SDK buildroot target 复制 Mali libmali.so；检查 lightdm/gdm 日志</td>
+          </tr>
+          <tr>
+            <td>ping 报 "Operation not permitted"</td>
+            <td>ping 权限问题</td>
+            <td><code>sudo setcap cap_net_raw+p /bin/ping</code></td>
+          </tr>
+          <tr>
+            <td>chroot 内 apt 无法连网</td>
+            <td>resolv.conf 未正确复制</td>
+            <td><code>sudo cp -L /etc/resolv.conf ubuntu_rootfs/etc/</code></td>
+          </tr>
+          <tr>
+            <td>内核模块加载失败</td>
+            <td>内核版本与模块版本不匹配</td>
+            <td>确保 <code>modules_install</code> 和 <code>boot.img</code> 使用同一内核源码编译</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ===================== SECTION 12 ===================== -->
+  <section class="section" id="s12">
+    <div class="section-header">
+      <div class="step-num">12</div>
+      <h2>快速参考脚本汇总</h2>
+    </div>
+
+    <p>将以下三个脚本放在同一目录，即可实现一键化操作流程：</p>
+
+    <h3>① mount-rootfs.sh — 挂载/卸载工具</h3>
+    <div class="code-block">
+      <div class="code-label"><span class="lang">bash</span><span>已在第4节完整给出</span></div>
+      <pre">用法: sudo ./mount-rootfs.sh -m ubuntu_rootfs/   <span class="comment"># 挂载</span>
+     sudo ./mount-rootfs.sh -u ubuntu_rootfs/   <span class="comment"># 卸载</span></pre>
+    </div>
+
+    <h3>② mk-ubuntu-rootfs.sh — 打包 ext4 镜像</h3>
+    <div class="code-block">
+      <div class="code-label"><span class="lang">bash</span><span>已在第7节完整给出</span></div>
+      <pre">用法: sudo ./mk-ubuntu-rootfs.sh
+<span class="comment"># 输出: ubuntu-rootfs.img</span></pre>
+    </div>
+
+    <h3>③ flash-ubuntu.sh — 一键烧录脚本（Linux）</h3>
+    <div class="script-file">
+      <div class="script-file-header">
+        <div class="file-dot" style="background:#ff5f56"></div>
+        <div class="file-dot" style="background:#ffbd2e"></div>
+        <div class="file-dot" style="background:#27c93f"></div>
+        <span class="filename">~/rk3588_sdk/flash-ubuntu.sh</span>
+      </div>
+      <pre>#!/bin/bash
+# 一键烧录 Ubuntu 固件到 RK3588 开发板
+set -e
+
+SDK_DIR="$(cd "$(dirname "$0")" && pwd)"
+TOOL="${SDK_DIR}/tools/upgrade_tool"
+UBUNTU_ROOTFS="$HOME/ubuntu_build/ubuntu-rootfs.img"
+IMG_DIR="${SDK_DIR}/buildroot/output/images"
+PARAM="${SDK_DIR}/device/rockchip/rk3588/parameter.txt"
+UBOOT_DIR="${SDK_DIR}/u-boot"
+
+echo "=============================="
+echo " RK3588 Ubuntu 一键烧录工具"
+echo "=============================="
+
+if [ ! -f "${UBUNTU_ROOTFS}" ]; then
+    echo "[错误] 找不到 ${UBUNTU_ROOTFS}"
+    echo "请先运行 mk-ubuntu-rootfs.sh 生成 rootfs 镜像"
+    exit 1
+fi
+
+echo "[1/8] 检查设备连接..."
+sudo ${TOOL} LD || { echo "未检测到设备，请确认开发板处于 Loader/Maskrom 模式"; exit 1; }
+
+echo "[2/8] 烧写 Loader..."
+sudo ${TOOL} UL ${UBOOT_DIR}/MiniLoaderAll.bin -noreset
+
+echo "[3/8] 烧写分区表..."
+sudo ${TOOL} DI -p ${PARAM}
+
+echo "[4/8] 烧写 U-Boot..."
+sudo ${TOOL} DI -uboot ${UBOOT_DIR}/uboot.img
+
+echo "[5/8] 烧写 misc..."
+sudo ${TOOL} DI -misc ${IMG_DIR}/misc.img
+
+echo "[6/8] 烧写 boot（内核+设备树）..."
+sudo ${TOOL} DI -boot ${IMG_DIR}/boot.img
+
+echo "[7/8] 烧写 recovery..."
+sudo ${TOOL} DI -recovery ${IMG_DIR}/recovery.img
+
+echo "[8/8] 烧写 Ubuntu rootfs..."
+sudo ${TOOL} DI -rootfs ${UBUNTU_ROOTFS}
+
+echo ""
+echo "[✓] 所有镜像烧写完成！正在重启开发板..."
+sudo ${TOOL} RD</pre>
+    </div>
+
+    <div class="code-block">
+      <div class="code-label"><span class="lang">bash</span></div>
+      <pre>chmod +x ~/rk3588_sdk/flash-ubuntu.sh
+sudo ~/rk3588_sdk/flash-ubuntu.sh</pre>
+    </div>
+  </section>
+
+  <hr>
+
+  <!-- 总结 -->
+  <div class="callout success">
+    <span class="callout-icon">🎉</span>
+    <div class="callout-content">
+      <strong>移植完成！</strong>至此，你已完成：
+      <ul style="list-style:disc;padding-left:20px;margin-top:8px;font-size:13px;line-height:1.8">
+        <li>基于正点原子 Buildroot SDK 编译内核、U-Boot 和设备树</li>
+        <li>使用 Ubuntu-Base + QEMU chroot 构建 ARM64 Ubuntu 22.04 根文件系统</li>
+        <li>集成 Rockchip 内核模块和硬件固件</li>
+        <li>打包为 ext4 镜像并替换 SDK 中的 rootfs</li>
+        <li>通过 upgrade_tool 或 RKDevTool 完整烧录到 ATK-DLRK3588 开发板</li>
+      </ul>
+    </div>
+  </div>
+
+</div><!-- /container -->
+
+<footer>
+  <p>教程整理参考：<a href="https://www.bilibili.com/video/BV1k1WNz8ES8/" target="_blank">哔哩哔哩《开发板移植Ubuntu系统全记录》</a> &nbsp;|&nbsp; 
+  <a href="https://blog.csdn.net/qq_34117760/article/details/130909986" target="_blank">基于 RK3588 构建 Ubuntu 22.04 根文件系统</a> &nbsp;|&nbsp; 
+  <a href="https://endlesspeak.github.io/docs/build/arm-linux-doc/2-rk3588-ubuntu-migrate/" target="_blank">ATK-DLRK3588 移植参考</a></p>
+  <p style="margin-top:8px;color:#3a4260">以正点原子 ATK-DLRK3588 开发板为参考，请结合实际 SDK 版本和硬件资料操作</p>
+</footer>
+
+</body>
+</html>
