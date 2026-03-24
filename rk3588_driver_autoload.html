@@ -1,0 +1,1177 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ATK-DLRK3588 Ubuntu 22.04 板载驱动自动加载完整教程</title>
+<style>
+  :root {
+    --primary: #2196f3;
+    --primary-dark: #1565c0;
+    --accent: #64b5f6;
+    --bg: #0d1117;
+    --surface: #161b22;
+    --surface2: #21262d;
+    --border: #30363d;
+    --text: #e6edf3;
+    --text-muted: #8b949e;
+    --text-dim: #484f58;
+    --code-bg: #0d1117;
+    --code-border: #21262d;
+    --success: #3fb950;
+    --warning: #d29922;
+    --danger: #f85149;
+    --info: #58a6ff;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.75;
+    font-size: 15px;
+  }
+  header {
+    background: linear-gradient(135deg, #0a1628 0%, #0d2137 50%, #161b22 100%);
+    border-bottom: 2px solid var(--primary);
+    padding: 44px 0 32px;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+  }
+  header::before {
+    content: '';
+    position: absolute; inset: 0;
+    background: radial-gradient(ellipse at 50% 0%, rgba(33,150,243,0.15) 0%, transparent 65%);
+    pointer-events: none;
+  }
+  .chip-badge {
+    display: inline-block;
+    background: linear-gradient(135deg, #1565c0, #0288d1);
+    color: #fff;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    padding: 4px 14px;
+    border-radius: 20px;
+    margin-bottom: 16px;
+  }
+  header h1 { font-size: clamp(20px, 4vw, 34px); font-weight: 800; color: #fff; margin-bottom: 10px; }
+  header h1 span { color: var(--accent); }
+  header p.subtitle { color: var(--text-muted); font-size: 14px; max-width: 600px; margin: 0 auto; }
+  .header-meta { margin-top: 18px; display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; }
+  .meta-tag { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; padding: 3px 12px; font-size: 12px; color: var(--text-muted); }
+  .meta-tag strong { color: var(--accent); }
+  .container { max-width: 960px; margin: 0 auto; padding: 0 24px; }
+
+  /* TOC */
+  .toc-card { background: var(--surface); border: 1px solid var(--border); border-left: 4px solid var(--primary); border-radius: 10px; margin: 32px 0 28px; padding: 22px 26px; }
+  .toc-card h2 { font-size: 13px; color: var(--accent); margin-bottom: 14px; letter-spacing: 1px; text-transform: uppercase; }
+  .toc-list { list-style: none; display: grid; grid-template-columns: 1fr 1fr; gap: 4px 28px; }
+  @media (max-width: 580px) { .toc-list { grid-template-columns: 1fr; } }
+  .toc-list li a { color: var(--text-muted); text-decoration: none; font-size: 13px; display: flex; align-items: center; gap: 8px; padding: 3px 0; transition: color .2s; }
+  .toc-list li a:hover { color: var(--accent); }
+  .toc-num { color: var(--primary); font-weight: 700; font-size: 12px; min-width: 20px; }
+
+  /* SECTIONS */
+  .section { margin-bottom: 50px; }
+  .section-header { display: flex; align-items: center; gap: 14px; margin-bottom: 22px; padding-bottom: 12px; border-bottom: 1px solid var(--border); }
+  .step-num { width: 40px; height: 40px; border-radius: 50%; background: linear-gradient(135deg, var(--primary), #0288d1); color: #fff; font-weight: 800; font-size: 17px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .section-header h2 { font-size: 21px; font-weight: 700; color: #fff; }
+  h3 { font-size: 15px; font-weight: 700; color: var(--accent); margin: 22px 0 10px; display: flex; align-items: center; gap: 8px; }
+  h3::before { content: ''; width: 3px; height: 15px; background: var(--primary); border-radius: 2px; display: inline-block; }
+  p { color: var(--text-muted); margin-bottom: 10px; }
+
+  /* CODE */
+  .code-block { background: var(--code-bg); border: 1px solid var(--code-border); border-radius: 8px; margin: 10px 0 18px; overflow: hidden; }
+  .code-label { background: rgba(255,255,255,0.03); border-bottom: 1px solid var(--code-border); padding: 6px 14px; font-size: 11px; color: var(--text-dim); display: flex; justify-content: space-between; align-items: center; }
+  .code-label .lang { color: var(--primary); font-weight: 700; text-transform: uppercase; font-size: 11px; }
+  pre { padding: 15px 18px; overflow-x: auto; font-family: 'Cascadia Code','Fira Code','Consolas',monospace; font-size: 13px; line-height: 1.65; color: #c9d1d9; }
+
+  /* FILE BLOCK */
+  .file-block { background: var(--code-bg); border: 1px solid var(--code-border); border-left: 3px solid #3fb950; border-radius: 8px; margin: 10px 0 18px; overflow: hidden; }
+  .file-block .code-label .lang { color: #3fb950; }
+
+  /* SCRIPT FILE */
+  .script-file { border: 1px solid var(--border); border-radius: 10px; overflow: hidden; margin: 12px 0 18px; }
+  .script-file-header { background: var(--surface2); padding: 9px 16px; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid var(--border); }
+  .file-dot { width: 8px; height: 8px; border-radius: 50%; }
+  .script-file-header .filename { color: var(--accent); font-size: 13px; font-family: monospace; }
+  .script-file pre { background: var(--code-bg); border: none; border-radius: 0; }
+
+  /* CALLOUTS */
+  .callout { border-radius: 8px; padding: 13px 16px; margin: 14px 0; display: flex; gap: 11px; align-items: flex-start; font-size: 13.5px; }
+  .callout-icon { font-size: 17px; flex-shrink: 0; margin-top: 1px; }
+  .callout.tip { background: rgba(88,166,255,0.08); border: 1px solid rgba(88,166,255,0.2); }
+  .callout.warn { background: rgba(210,153,34,0.1); border: 1px solid rgba(210,153,34,0.3); }
+  .callout.danger { background: rgba(248,81,73,0.08); border: 1px solid rgba(248,81,73,0.2); }
+  .callout.success { background: rgba(63,185,80,0.08); border: 1px solid rgba(63,185,80,0.2); }
+  .callout-content { color: var(--text-muted); }
+  .callout-content strong { color: var(--text); }
+
+  /* TABLES */
+  .table-wrap { overflow-x: auto; margin: 12px 0 20px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  thead tr { background: rgba(33,150,243,0.1); }
+  th { padding: 9px 13px; text-align: left; color: var(--accent); font-weight: 700; border-bottom: 2px solid var(--primary); white-space: nowrap; }
+  td { padding: 8px 13px; border-bottom: 1px solid var(--border); color: var(--text-muted); }
+  tr:hover td { background: rgba(255,255,255,0.02); }
+  td code { background: rgba(255,255,255,0.07); padding: 1px 6px; border-radius: 3px; font-size: 12px; color: #79c0ff; }
+
+  /* INLINE CODE */
+  code { background: rgba(255,255,255,0.07); padding: 1px 6px; border-radius: 4px; font-size: 13px; color: #79c0ff; font-family: monospace; }
+
+  /* BADGE */
+  .badge { display: inline-block; padding: 1px 8px; border-radius: 12px; font-size: 11px; font-weight: 700; margin-left: 6px; }
+  .badge-required { background: rgba(248,81,73,0.15); color: #f85149; border: 1px solid rgba(248,81,73,0.3); }
+  .badge-optional { background: rgba(63,185,80,0.1); color: #3fb950; border: 1px solid rgba(63,185,80,0.2); }
+  .badge-important { background: rgba(210,153,34,0.15); color: #d29922; border: 1px solid rgba(210,153,34,0.3); }
+
+  /* DEVICE GRID */
+  .device-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 12px 0 20px; }
+  @media (max-width: 600px) { .device-grid { grid-template-columns: 1fr 1fr; } }
+  .device-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; }
+  .device-card .icon { font-size: 20px; margin-bottom: 6px; }
+  .device-card h4 { font-size: 13px; color: var(--text); margin-bottom: 3px; }
+  .device-card p { font-size: 12px; margin: 0; }
+  .device-card .chip { font-size: 11px; color: var(--primary); margin-top: 4px; font-family: monospace; }
+
+  hr { border: none; border-top: 1px solid var(--border); margin: 40px 0; }
+
+  /* FLOW */
+  .flow-list { list-style: none; position: relative; padding-left: 22px; }
+  .flow-list::before { content: ''; position: absolute; left: 7px; top: 10px; bottom: 10px; width: 2px; background: linear-gradient(to bottom, var(--primary), transparent); }
+  .flow-list li { position: relative; padding: 5px 0 5px 18px; color: var(--text-muted); font-size: 13.5px; }
+  .flow-list li::before { content: ''; position: absolute; left: -9px; top: 12px; width: 8px; height: 8px; border-radius: 50%; background: var(--primary); border: 2px solid var(--bg); }
+
+  footer { background: var(--surface); border-top: 1px solid var(--border); padding: 24px; text-align: center; color: var(--text-dim); font-size: 12px; margin-top: 60px; }
+  footer a { color: var(--primary); text-decoration: none; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="container">
+    <div class="chip-badge">驱动配置教程</div>
+    <h1>ATK-DLRK3588 <span>Ubuntu 22.04</span></h1>
+    <h1>板载外设驱动自动加载完整教程</h1>
+    <p class="subtitle">开机自动识别并启动 WiFi、蓝牙、GPU、HDMI、以太网、摄像头、音频等全部板载外设驱动</p>
+    <div class="header-meta">
+      <span class="meta-tag">开发板 <strong>ATK-DLRK3588</strong></span>
+      <span class="meta-tag">系统 <strong>Ubuntu 22.04 LTS</strong></span>
+      <span class="meta-tag">内核 <strong>Linux 5.10.x / 6.1.x</strong></span>
+      <span class="meta-tag">架构 <strong>AArch64</strong></span>
+    </div>
+  </div>
+</header>
+
+<div class="container">
+
+  <div class="toc-card">
+    <h2>📋 目录</h2>
+    <ul class="toc-list">
+      <li><a href="#s1"><span class="toc-num">01</span>板载外设与驱动模块总览</a></li>
+      <li><a href="#s2"><span class="toc-num">02</span>诊断：查看当前驱动加载状态</a></li>
+      <li><a href="#s3"><span class="toc-num">03</span>配置 modules-load.d 自动加载</a></li>
+      <li><a href="#s4"><span class="toc-num">04</span>WiFi / 蓝牙驱动配置</a></li>
+      <li><a href="#s5"><span class="toc-num">05</span>GPU / 显示驱动配置</a></li>
+      <li><a href="#s6"><span class="toc-num">06</span>以太网驱动配置</a></li>
+      <li><a href="#s7"><span class="toc-num">07</span>音频驱动配置</a></li>
+      <li><a href="#s8"><span class="toc-num">08</span>USB / 摄像头驱动配置</a></li>
+      <li><a href="#s9"><span class="toc-num">09</span>NPU（RKNPU2）驱动配置</a></li>
+      <li><a href="#s10"><span class="toc-num">10</span>创建一键驱动加载启动服务</a></li>
+      <li><a href="#s11"><span class="toc-num">11</span>验证与常见问题排查</a></li>
+    </ul>
+  </div>
+
+  <!-- ===== S1 ===== -->
+  <section class="section" id="s1">
+    <div class="section-header">
+      <div class="step-num">1</div>
+      <h2>板载外设与驱动模块总览</h2>
+    </div>
+
+    <p>ATK-DLRK3588 开发板搭载了以下主要板载外设，Ubuntu 系统需要为每种外设正确加载对应的内核模块：</p>
+
+    <div class="device-grid">
+      <div class="device-card">
+        <div class="icon">📶</div>
+        <h4>WiFi / 蓝牙</h4>
+        <p>二合一无线模块</p>
+        <div class="chip">RTL8733BU</div>
+      </div>
+      <div class="device-card">
+        <div class="icon">🖥️</div>
+        <h4>GPU</h4>
+        <p>图形处理器</p>
+        <div class="chip">Mali-G610 MP4</div>
+      </div>
+      <div class="device-card">
+        <div class="icon">🔌</div>
+        <h4>以太网 ×2</h4>
+        <p>双千兆网口</p>
+        <div class="chip">GMAC + YT8531C PHY</div>
+      </div>
+      <div class="device-card">
+        <div class="icon">🔊</div>
+        <h4>音频</h4>
+        <p>I2S / HDMI 音频</p>
+        <div class="chip">ES8388 / HDMI</div>
+      </div>
+      <div class="device-card">
+        <div class="icon">📷</div>
+        <h4>摄像头 MIPI</h4>
+        <p>CSI 摄像头接口</p>
+        <div class="chip">MIPI CSI × 2</div>
+      </div>
+      <div class="device-card">
+        <div class="icon">🎬</div>
+        <h4>视频编解码</h4>
+        <p>硬件媒体处理</p>
+        <div class="chip">RK VPU / MPP</div>
+      </div>
+      <div class="device-card">
+        <div class="icon">🧠</div>
+        <h4>NPU</h4>
+        <p>6 TOPS AI 推理</p>
+        <div class="chip">RKNPU2 / rknpu.ko</div>
+      </div>
+      <div class="device-card">
+        <div class="icon">🖵</div>
+        <h4>HDMI / DP</h4>
+        <p>显示输出</p>
+        <div class="chip">HDMI2.1 / DP1.4</div>
+      </div>
+      <div class="device-card">
+        <div class="icon">🔋</div>
+        <h4>USB 控制器</h4>
+        <p>USB3.0 / 2.0</p>
+        <div class="chip">xHCI / DWC3</div>
+      </div>
+      <div class="device-card">
+        <div class="icon">📡</div>
+        <h4>PCIe / M.2</h4>
+        <p>高速扩展接口</p>
+        <div class="chip">PCIe 3.0 × 4</div>
+      </div>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>外设</th><th>内核模块名</th><th>加载方式</th><th>优先级</th></tr></thead>
+        <tbody>
+          <tr><td>WiFi (RTL8733BU)</td><td><code>rtl8xxxu</code> / <code>8733bu</code></td><td>modules-load.d + firmware</td><td><span class="badge badge-required">必须</span></td></tr>
+          <tr><td>蓝牙</td><td><code>btusb</code> / <code>hci_uart</code></td><td>modules-load.d + rfkill</td><td><span class="badge badge-required">必须</span></td></tr>
+          <tr><td>Mali GPU</td><td><code>bifrost_kbase</code> / <code>mali_kbase</code></td><td>modules-load.d</td><td><span class="badge badge-required">必须</span></td></tr>
+          <tr><td>HDMI 显示</td><td><code>rockchipdrm</code> / <code>dw_hdmi</code></td><td>内置 / DRM 子系统</td><td><span class="badge badge-required">必须</span></td></tr>
+          <tr><td>以太网 GMAC</td><td><code>rk_gmac_dwmac</code></td><td>设备树自动</td><td><span class="badge badge-important">自动</span></td></tr>
+          <tr><td>以太网 PHY（YT8531C）</td><td><code>motorcomm</code></td><td>modules-load.d</td><td><span class="badge badge-required">必须</span></td></tr>
+          <tr><td>音频 ES8388</td><td><code>snd_soc_es8388</code></td><td>modules-load.d</td><td><span class="badge badge-required">必须</span></td></tr>
+          <tr><td>视频编解码 MPP</td><td><code>rk_vcodec</code></td><td>modules-load.d</td><td><span class="badge badge-optional">推荐</span></td></tr>
+          <tr><td>摄像头 CSI</td><td><code>video_rkisp</code></td><td>modules-load.d</td><td><span class="badge badge-optional">按需</span></td></tr>
+          <tr><td>NPU（RKNPU2）</td><td><code>rknpu</code></td><td>modules-load.d + librknnrt</td><td><span class="badge badge-required">必须</span></td></tr>
+          <tr><td>USB xHCI</td><td><code>xhci_hcd</code></td><td>内置</td><td><span class="badge badge-important">自动</span></td></tr>
+          <tr><td>RTC 实时时钟</td><td><code>rtc_hym8563</code></td><td>设备树自动</td><td><span class="badge badge-important">自动</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ===== S2 ===== -->
+  <section class="section" id="s2">
+    <div class="section-header">
+      <div class="step-num">2</div>
+      <h2>诊断：查看当前驱动加载状态</h2>
+    </div>
+
+    <p>在配置自动加载之前，先摸清楚当前系统哪些驱动已经加载、哪些还缺失。在开发板上执行以下命令：</p>
+
+    <h3>① 查看已加载的内核模块</h3>
+    <div class="code-block">
+      <div class="code-label"><span class="lang">bash</span><span>开发板上执行</span></div>
+      <pre>lsmod</pre>
+    </div>
+
+    <h3>② 检查各外设是否已识别</h3>
+    <div class="code-block">
+      <div class="code-label"><span class="lang">bash</span><span>开发板上执行</span></div>
+      <pre>ip link show                          # 查看网卡列表（有无 wlan0、eth0、eth1）
+ls /sys/class/net/                    # 同上
+ls /sys/class/bluetooth/              # 是否有蓝牙设备
+ls /dev/dri/                          # DRM GPU 设备（应有 card0、renderD128）
+ls /dev/video*                        # 摄像头设备
+ls /proc/asound/cards                 # 音频声卡列表
+lspci                                 # PCIe 设备列表
+lsusb                                 # USB 设备列表</pre>
+    </div>
+
+    <h3>③ 查看内核识别到哪些模块</h3>
+
+    <p>先确认内核模块目录中有哪些模块可用：</p>
+    <div class="code-block">
+      <div class="code-label"><span class="lang">bash</span><span>开发板上执行</span></div>
+      <pre>ls /lib/modules/$(uname -r)/kernel/drivers/</pre>
+    </div>
+
+    <p>搜索特定模块是否存在：</p>
+    <div class="code-block">
+      <div class="code-label"><span class="lang">bash</span><span>开发板上执行</span></div>
+      <pre>find /lib/modules/$(uname -r)/ -name "*.ko" | grep -E "mali|gpu|wifi|rtl|8733|gmac|motorcomm|yt8531|es8388|mpp|vcodec|rkisp" | sort</pre>
+    </div>
+
+    <h3>④ 查看开机时的内核日志</h3>
+
+    <p>检查驱动加载和设备探测日志，看哪些设备有报错：</p>
+    <div class="code-block">
+      <div class="code-label"><span class="lang">bash</span><span>开发板上执行</span></div>
+      <pre>dmesg | grep -E "mali|gpu|wifi|rtl8|gmac|motorcomm|yt8531|es8388|mpp|vcodec|rkisp|bluetooth|hci" | head -60</pre>
+    </div>
+
+    <div class="callout tip">
+      <span class="callout-icon">💡</span>
+      <div class="callout-content">
+        <strong>分析技巧：</strong>如果 <code>dmesg</code> 中出现 <code>module not found</code> 或 <code>No such file</code>，说明模块文件缺失，需要重新从 SDK 内核编译安装。如果出现 <code>firmware not found</code>，说明固件文件缺失，需要复制固件。
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== S3 ===== -->
+  <section class="section" id="s3">
+    <div class="section-header">
+      <div class="step-num">3</div>
+      <h2>配置 modules-load.d 自动加载</h2>
+    </div>
+
+    <p>Linux 系统通过 <code>/etc/modules-load.d/</code> 目录下的配置文件，让 <strong>systemd-modules-load</strong> 服务在开机时自动加载指定模块。这是 Ubuntu 22.04 推荐的标准方式。</p>
+
+    <h3>创建 RK3588 驱动自动加载配置文件</h3>
+
+    <p>在开发板上创建以下配置文件，一次性配置所有板载外设的驱动自动加载：</p>
+
+    <div class="file-block">
+      <div class="code-label"><span class="lang">写入文件</span><span>/etc/modules-load.d/rk3588-drivers.conf</span></div>
+      <pre>sudo tee /etc/modules-load.d/rk3588-drivers.conf &lt;&lt; 'EOF'
+# ============================================
+# ATK-DLRK3588 板载外设驱动自动加载配置
+# ============================================
+
+# --- GPU / 显示 ---
+bifrost_kbase
+rockchipdrm
+dw_hdmi_cec
+
+# --- 以太网 ---
+rk_gmac_dwmac
+motorcomm
+
+# --- WiFi (RTL8733BU USB) ---
+rtl8xxxu
+
+# --- 蓝牙 ---
+btusb
+bluetooth
+hci_uart
+
+# --- 音频 ---
+snd_soc_es8388
+snd_soc_rockchip_i2s
+
+# --- 视频编解码 (MPP/VPU) ---
+rk_vcodec
+
+# --- NPU (RKNPU2) ---
+rknpu
+
+# --- 摄像头 ISP ---
+video_rkisp
+rkisp_hw
+
+# --- 其他外设 ---
+pwm_rockchip
+rockchip_saradc
+rtc_hym8563
+EOF</pre>
+    </div>
+
+    <p>使配置立即生效（不重启验证）：</p>
+    <div class="code-block">
+      <div class="code-label"><span class="lang">bash</span><span>开发板上执行</span></div>
+      <pre>sudo systemctl restart systemd-modules-load.service
+sudo systemctl status systemd-modules-load.service</pre>
+    </div>
+
+    <h3>配置 modprobe 模块参数（可选）</h3>
+
+    <p>部分模块加载时需要传入参数，在 <code>/etc/modprobe.d/</code> 下创建配置：</p>
+
+    <div class="file-block">
+      <div class="code-label"><span class="lang">写入文件</span><span>/etc/modprobe.d/rk3588.conf</span></div>
+      <pre>sudo tee /etc/modprobe.d/rk3588.conf &lt;&lt; 'EOF'
+# RK3588 模块参数配置
+# Mali GPU - 设置性能模式
+options bifrost_kbase power_policy=coarse_demand
+
+# 蓝牙 - 启用 HCI UART 协议
+options hci_uart enable_autobaud=1
+EOF</pre>
+    </div>
+
+    <div class="callout warn">
+      <span class="callout-icon">⚠️</span>
+      <div class="callout-content">
+        <strong>注意：</strong>配置文件中的模块名必须与实际 <code>.ko</code> 文件名完全一致（不含 <code>.ko</code> 后缀）。如果某个模块不存在，<code>systemd-modules-load</code> 会在日志中报错但不影响其他模块加载。
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== S4 ===== -->
+  <section class="section" id="s4">
+    <div class="section-header">
+      <div class="step-num">4</div>
+      <h2>WiFi / 蓝牙驱动配置</h2>
+    </div>
+
+    <p>ATK-DLRK3588 板载 WiFi/BT 模块为 <strong>RTL8733BU</strong>，通过 USB 内部总线连接。Ubuntu 内核通常已内置 <code>rtl8xxxu</code> 驱动，但需要确认固件文件存在。</p>
+
+    <h3>① 检查 WiFi 模块识别情况</h3>
+    <div class="code-block">
+      <div class="code-label"><span class="lang">bash</span><span>开发板上执行</span></div>
+      <pre>lsusb | grep -i realtek
+lsmod | grep rtl</pre>
+    </div>
+
+    <h3>② 安装 WiFi 固件</h3>
+
+    <p>Ubuntu 22.04 的 linux-firmware 包通常包含 RTL 系列固件，先确认是否已安装：</p>
+    <div class="code-block">
+      <div class="code-label"><span class="lang">bash</span><span>开发板上执行</span></div>
+      <pre>dpkg -l linux-firmware
+ls /lib/firmware/rtlwifi/ 2>/dev/null || echo "固件目录不存在"</pre>
+    </div>
+
+    <p>如果固件缺失，安装 linux-firmware 包：</p>
+    <div class="code-block">
+      <div class="code-label"><span class="lang">bash</span><span>开发板上执行</span></div>
+      <pre>sudo apt update
+sudo apt install -y linux-firmware wireless-tools wpasupplicant</pre>
+    </div>
+
+    <h3>③ 手动测试 WiFi 驱动加载</h3>
+    <div class="code-block">
+      <div class="code-label"><span class="lang">bash</span><span>开发板上执行</span></div>
+      <pre>sudo modprobe rtl8xxxu
+ip link show wlan0</pre>
+    </div>
+
+    <p>如果 <code>rtl8xxxu</code> 无法驱动该模块，尝试 SDK 中提供的树外驱动：</p>
+    <div class="code-block">
+      <div class="code-label"><span class="lang">bash</span><span>开发板上执行</span></div>
+      <pre>find /lib/modules/$(uname -r)/ -name "*8733*" -o -name "*rtl8733*" 2>/dev/null
+sudo modprobe 8733bu 2>/dev/null || sudo modprobe rtl8733bu 2>/dev/null</pre>
+    </div>
+
+    <h3>④ 配置 WiFi 开机自动连接</h3>
+    <div class="code-block">
+      <div class="code-label"><span class="lang">bash</span><span>开发板上执行</span></div>
+      <pre>sudo nmcli dev wifi connect "你的WiFi名称" password "你的WiFi密码"
+sudo nmcli con modify "你的WiFi名称" connection.autoconnect yes</pre>
+    </div>
+
+    <h3>⑤ 蓝牙驱动配置</h3>
+
+    <p>安装蓝牙协议栈并启用服务：</p>
+    <div class="code-block">
+      <div class="code-label"><span class="lang">bash</span><span>开发板上执行</span></div>
+      <pre>sudo apt install -y bluez bluez-tools rfkill</pre>
+    </div>
+
+    <p>解除蓝牙 rfkill 软封锁并启用服务：</p>
+    <div class="code-block">
+      <div class="code-label"><span class="lang">bash</span><span>开发板上执行</span></div>
+      <pre>sudo rfkill unblock bluetooth
+sudo rfkill unblock all
+sudo systemctl enable bluetooth
+sudo systemctl start bluetooth</pre>
+    </div>
+
+    <p>验证蓝牙是否正常工作：</p>
+    <div class="code-block">
+      <div class="code-label"><span class="lang">bash</span><span>开发板上执行</span></div>
+      <pre>hciconfig -a
+bluetoothctl show</pre>
+    </div>
+
+    <h3>⑥ 创建 rfkill 解锁开机服务</h3>
+
+    <p>防止 rfkill 在开机时阻止蓝牙和 WiFi：</p>
+
+    <div class="file-block">
+      <div class="code-label"><span class="lang">写入文件</span><span>/etc/systemd/system/rfkill-unblock.service</span></div>
+      <pre>sudo tee /etc/systemd/system/rfkill-unblock.service &lt;&lt; 'EOF'
+[Unit]
+Description=Unblock all RF devices on boot
+After=network-pre.target
+Before=network.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/sbin/rfkill unblock all
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
+EOF</pre>
+    </div>
+
+    <div class="code-block">
+      <div class="code-label"><span class="lang">bash</span><span>开发板上执行</span></div>
+      <pre>sudo systemctl daemon-reload
+sudo systemctl enable rfkill-unblock.service
+sudo systemctl start rfkill-unblock.service</pre>
+    </div>
+  </section>
+
+  <!-- ===== S5 ===== -->
+  <section class="section" id="s5">
+    <div class="section-header">
+      <div class="step-num">5</div>
+      <h2>GPU / 显示驱动配置</h2>
+    </div>
+
+    <p>RK3588 搭载 <strong>Mali-G610 MP4</strong> GPU，需要正确加载内核驱动模块以及用户态 OpenGL/Vulkan 库。</p>
+
+    <h3>① 确认 GPU 模块名称</h3>
+    <div class="code-block">
+      <div class="code-label"><span class="lang">bash</span><span>开发板上执行</span></div>
+      <pre>find /lib/modules/$(uname -r)/ -name "*.ko" | grep -E "mali|gpu|bifrost|panfrost"</pre>
+    </div>
+
+    <p>根据内核版本，模块名可能是：</p>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>内核版本</th><th>模块名</th><th>说明</th></tr></thead>
+        <tbody>
+          <tr><td>RK Linux 5.10.x (SDK)</td><td><code>bifrost_kbase</code></td><td>Arm 官方 Mali 驱动</td></tr>
+          <tr><td>上游内核 6.x</td><td><code>panfrost</code></td><td>开源 GPU 驱动（功能受限）</td></tr>
+          <tr><td>部分 SDK 变体</td><td><code>mali_kbase</code></td><td>旧版命名</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>② 加载 GPU 模块并验证</h3>
+    <div class="code-block">
+      <div class="code-label"><span class="lang">bash</span><span>开发板上执行</span></div>
+      <pre>sudo modprobe bifrost_kbase
+ls /dev/mali*
+ls /dev/dri/</pre>
+    </div>
+
+    <p>成功后应看到 <code>/dev/mali0</code> 以及 <code>/dev/dri/card0</code>、<code>/dev/dri/renderD128</code>。</p>
+
+    <h3>③ 安装用户态 GPU 库</h3>
+
+    <p>安装 Mesa 开源图形库（HDMI/DP 显示基础）：</p>
+    <div class="code-block">
+      <div class="code-label"><span class="lang">bash</span><span>开发板上执行</span></div>
+      <pre>sudo apt install -y libdrm2 libgl1-mesa-dri libgles2-mesa-dev libegl1-mesa-dev</pre>
+    </div>
+
+    <p>如果使用正点原子 SDK 提供的 Mali 闭源用户态库，从宿主机 buildroot target 复制过来：</p>
+    <div class="code-block">
+      <div class="code-label"><span class="lang">bash</span><span>宿主机执行（将文件 scp 到板子）</span></div>
+      <pre>scp ~/rk3588_sdk/buildroot/output/rockchip_atk_dlrk3588/target/usr/lib/aarch64-linux-gnu/libmali*.so* \
+    ubuntu@开发板IP:/tmp/
+</pre>
+    </div>
+    <div class="code-block">
+      <div class="code-label"><span class="lang">bash</span><span>开发板上执行</span></div>
+      <pre>sudo cp /tmp/libmali*.so* /usr/lib/aarch64-linux-gnu/
+sudo ldconfig</pre>
+    </div>
+
+    <h3>④ 配置 DRM 权限</h3>
+    <div class="code-block">
+      <div class="code-label"><span class="lang">bash</span><span>开发板上执行</span></div>
+      <pre>sudo usermod -aG video,render $(whoami)
+sudo chmod 666 /dev/dri/renderD128
+sudo chmod 666 /dev/mali0 2>/dev/null || true</pre>
+    </div>
+
+    <p>为了永久生效，创建 udev 规则：</p>
+    <div class="file-block">
+      <div class="code-label"><span class="lang">写入文件</span><span>/etc/udev/rules.d/99-mali-permissions.rules</span></div>
+      <pre>sudo tee /etc/udev/rules.d/99-mali-permissions.rules &lt;&lt; 'EOF'
+SUBSYSTEM=="drm", GROUP="video", MODE="0666"
+KERNEL=="mali*", GROUP="video", MODE="0666"
+KERNEL=="renderD*", GROUP="render", MODE="0666"
+EOF</pre>
+    </div>
+    <div class="code-block">
+      <div class="code-label"><span class="lang">bash</span><span>开发板上执行</span></div>
+      <pre>sudo udevadm control --reload-rules
+sudo udevadm trigger</pre>
+    </div>
+  </section>
+
+  <!-- ===== S6 ===== -->
+  <section class="section" id="s6">
+    <div class="section-header">
+      <div class="step-num">6</div>
+      <h2>以太网驱动配置</h2>
+    </div>
+
+    <p>ATK-DLRK3588 的千兆以太网由两部分组成：RK3588 内置的 <strong>GMAC MAC 控制器</strong>（驱动 <code>rk_gmac_dwmac</code>，通常由设备树自动探测）和外置 PHY 芯片 <strong>MotorComm YT8531C</strong>（驱动模块 <code>motorcomm</code>，需要手动确认加载）。</p>
+
+    <h3>① 检查以太网状态</h3>
+
+    <p>查看当前网卡列表和已加载的相关模块：</p>
+    <div class="code-block">
+      <div class="code-label"><span class="lang">bash</span><span>开发板上执行</span></div>
+      <pre>ip link show
+lsmod | grep -E "gmac|motorcomm|yt8531"
+dmesg | grep -E "eth|gmac|motorcomm|yt8531|YT8531"</pre>
+    </div>
+
+    <h3>② 确认 motorcomm PHY 驱动已安装</h3>
+
+    <p>在 SDK 编译的内核中，YT8531C PHY 驱动以 <code>motorcomm.ko</code> 形式存在（内核配置项 <code>CONFIG_MOTORCOMM_PHY</code>），先确认模块文件存在：</p>
+    <div class="code-block">
+      <div class="code-label"><span class="lang">bash</span><span>开发板上执行</span></div>
+      <pre>find /lib/modules/$(uname -r)/ -name "motorcomm*"</pre>
+    </div>
+
+    <p>如果找到了模块文件，手动加载验证：</p>
+    <div class="code-block">
+      <div class="code-label"><span class="lang">bash</span><span>开发板上执行</span></div>
+      <pre>sudo modprobe motorcomm
+lsmod | grep motorcomm
+dmesg | tail -20</pre>
+    </div>
+
+    <p>加载成功后，GMAC 会自动探测到 YT8531C PHY，网卡 <code>eth0</code> 应出现在 <code>ip link show</code> 结果中。</p>
+
+    <div class="callout tip">
+      <span class="callout-icon">💡</span>
+      <div class="callout-content">
+        <strong>驱动内置情况：</strong>如果 <code>find</code> 命令找不到 <code>motorcomm.ko</code>，说明该 PHY 驱动被静态编译进内核（<code>CONFIG_MOTORCOMM_PHY=y</code>），此时无需手动 modprobe，设备树会自动完成绑定，<code>ip link show</code> 里直接能看到 <code>eth0</code>。
+      </div>
+    </div>
+
+    <h3>③ 配置开机自动获取 IP（netplan）</h3>
+
+    <p>使用 Ubuntu 22.04 标准的 netplan 方式配置网卡 DHCP：</p>
+
+    <div class="file-block">
+      <div class="code-label"><span class="lang">写入文件</span><span>/etc/netplan/01-rk3588-network.yaml</span></div>
+      <pre>sudo tee /etc/netplan/01-rk3588-network.yaml &lt;&lt; 'EOF'
+network:
+  version: 2
+  renderer: networkd
+  ethernets:
+    eth0:
+      dhcp4: true
+      optional: true
+      nameservers:
+        addresses: [114.114.114.114, 8.8.8.8]
+EOF</pre>
+    </div>
+
+    <div class="code-block">
+      <div class="code-label"><span class="lang">bash</span><span>开发板上执行</span></div>
+      <pre>sudo chmod 600 /etc/netplan/01-rk3588-network.yaml
+sudo netplan apply</pre>
+    </div>
+
+    <p>验证网络是否通：</p>
+    <div class="code-block">
+      <div class="code-label"><span class="lang">bash</span><span>开发板上执行</span></div>
+      <pre>ip addr show eth0
+ping -c 3 114.114.114.114</pre>
+    </div>
+  </section>
+
+  <!-- ===== S7 ===== -->
+  <section class="section" id="s7">
+    <div class="section-header">
+      <div class="step-num">7</div>
+      <h2>音频驱动配置</h2>
+    </div>
+
+    <p>ATK-DLRK3588 板载音频编解码芯片为 <strong>ES8388</strong>，通过 I2C 和 I2S 连接到 RK3588。</p>
+
+    <h3>① 检查音频设备</h3>
+    <div class="code-block">
+      <div class="code-label"><span class="lang">bash</span><span>开发板上执行</span></div>
+      <pre>cat /proc/asound/cards
+aplay -l
+lsmod | grep snd</pre>
+    </div>
+
+    <h3>② 安装 ALSA 音频工具</h3>
+    <div class="code-block">
+      <div class="code-label"><span class="lang">bash</span><span>开发板上执行</span></div>
+      <pre>sudo apt install -y alsa-utils alsa-base libasound2 pulseaudio</pre>
+    </div>
+
+    <h3>③ 加载音频驱动模块</h3>
+    <div class="code-block">
+      <div class="code-label"><span class="lang">bash</span><span>开发板上执行</span></div>
+      <pre>sudo modprobe snd_soc_es8388
+sudo modprobe snd_soc_rockchip_i2s
+sudo modprobe snd-hda-intel 2>/dev/null || true</pre>
+    </div>
+
+    <h3>④ 设置默认音量（解除静音）</h3>
+    <div class="code-block">
+      <div class="code-label"><span class="lang">bash</span><span>开发板上执行</span></div>
+      <pre>sudo alsactl init
+amixer sset Master 80% unmute 2>/dev/null || true
+amixer sset Headphone 80% unmute 2>/dev/null || true</pre>
+    </div>
+
+    <p>保存音量设置，开机自动恢复：</p>
+    <div class="code-block">
+      <div class="code-label"><span class="lang">bash</span><span>开发板上执行</span></div>
+      <pre>sudo alsactl store
+sudo systemctl enable alsa-restore.service</pre>
+    </div>
+  </section>
+
+  <!-- ===== S8 ===== -->
+  <section class="section" id="s8">
+    <div class="section-header">
+      <div class="step-num">8</div>
+      <h2>USB / 摄像头驱动配置</h2>
+    </div>
+
+    <h3>USB 控制器（通常自动加载）</h3>
+    <div class="code-block">
+      <div class="code-label"><span class="lang">bash</span><span>开发板上执行</span></div>
+      <pre>lsmod | grep -E "xhci|dwc3|ehci|ohci"
+lsusb</pre>
+    </div>
+
+    <p>如果 USB 3.0 设备无法识别：</p>
+    <div class="code-block">
+      <div class="code-label"><span class="lang">bash</span><span>开发板上执行</span></div>
+      <pre>sudo modprobe xhci_hcd
+sudo modprobe dwc3</pre>
+    </div>
+
+    <h3>MIPI CSI 摄像头驱动</h3>
+    <div class="code-block">
+      <div class="code-label"><span class="lang">bash</span><span>开发板上执行</span></div>
+      <pre>find /lib/modules/$(uname -r)/ -name "*.ko" | grep -E "rkisp|rkisp1|cif|mipi"
+sudo modprobe video_rkisp
+sudo modprobe rkisp_hw 2>/dev/null || true</pre>
+    </div>
+
+    <p>安装 v4l2 工具验证摄像头：</p>
+    <div class="code-block">
+      <div class="code-label"><span class="lang">bash</span><span>开发板上执行</span></div>
+      <pre>sudo apt install -y v4l-utils
+v4l2-ctl --list-devices</pre>
+    </div>
+
+    <h3>视频编解码 MPP</h3>
+    <div class="code-block">
+      <div class="code-label"><span class="lang">bash</span><span>开发板上执行</span></div>
+      <pre>sudo modprobe rk_vcodec
+ls /dev/mpp_service 2>/dev/null || ls /dev/rkvdec* 2>/dev/null || echo "MPP 设备节点检查"</pre>
+    </div>
+  </section>
+
+  <!-- ===== S9 NPU ===== -->
+  <section class="section" id="s9">
+    <div class="section-header">
+      <div class="step-num">9</div>
+      <h2>NPU（RKNPU2）驱动配置</h2>
+    </div>
+
+    <p>RK3588 内置 6 TOPS 算力的 NPU，驱动由两层组成：内核层 <code>rknpu.ko</code> 负责硬件调度，用户态层 <code>librknnrt.so</code> 提供推理 API。两层都需要正确安装，NPU 才能使用。</p>
+
+    <h3>① 检查内核驱动是否已加载</h3>
+
+    <p>先确认内核模块文件存在，并查看当前加载状态：</p>
+    <div class="code-block">
+      <div class="code-label"><span class="lang">bash</span><span>开发板上执行</span></div>
+      <pre>find /lib/modules/$(uname -r)/ -name "rknpu*"
+lsmod | grep rknpu
+ls /dev/rknpu*</pre>
+    </div>
+
+    <p>如果模块未加载，手动 modprobe 验证：</p>
+    <div class="code-block">
+      <div class="code-label"><span class="lang">bash</span><span>开发板上执行</span></div>
+      <pre>sudo modprobe rknpu
+dmesg | grep -i rknpu | tail -10</pre>
+    </div>
+
+    <p>加载成功后，<code>dmesg</code> 中应出现类似如下输出：</p>
+    <div class="code-block">
+      <div class="code-label"><span class="lang">内核日志（示例）</span><span>预期输出</span></div>
+      <pre>rknpu: Initialized rknpu 0.9.x 20240xxx for ffe40000.npu on minor 0
+rknpu: NPU power on.</pre>
+    </div>
+
+    <div class="callout tip">
+      <span class="callout-icon">💡</span>
+      <div class="callout-content">
+        <strong>驱动内置说明：</strong>正点原子 SDK 内核通常将 <code>CONFIG_ROCKCHIP_RKNPU=y</code> 静态编译进内核，此时 <code>find</code> 找不到 <code>rknpu.ko</code> 属于正常现象，<code>/dev/rknpu0</code> 会在启动时自动出现，无需手动 modprobe。
+      </div>
+    </div>
+
+    <h3>② 配置 /dev/rknpu 设备权限</h3>
+
+    <p>默认情况下 <code>/dev/rknpu0</code> 只有 root 可访问，需要添加 udev 规则让普通用户也能使用 NPU：</p>
+    <div class="file-block">
+      <div class="code-label"><span class="lang">写入文件</span><span>/etc/udev/rules.d/99-rknpu.rules</span></div>
+      <pre>sudo tee /etc/udev/rules.d/99-rknpu.rules &lt;&lt; 'EOF'
+KERNEL=="rknpu*", MODE="0666"
+KERNEL=="mpp_service", MODE="0666"
+EOF</pre>
+    </div>
+
+    <div class="code-block">
+      <div class="code-label"><span class="lang">bash</span><span>开发板上执行 — 立即生效</span></div>
+      <pre>sudo udevadm control --reload-rules
+sudo udevadm trigger
+ls -la /dev/rknpu*</pre>
+    </div>
+
+    <h3>③ 安装用户态运行库 librknnrt.so</h3>
+
+    <p>从正点原子 SDK 的 buildroot 输出目录中复制预编译好的运行库（无需重新编译）：</p>
+    <div class="code-block">
+      <div class="code-label"><span class="lang">bash</span><span>宿主机执行 — 复制库文件到 Ubuntu rootfs</span></div>
+      <pre>BUILDROOT_TARGET=~/rk3588_sdk/buildroot/output/rockchip_atk_dlrk3588/target
+
+# 复制 RKNN Runtime 库
+sudo cp ${BUILDROOT_TARGET}/usr/lib/librknnrt.so \
+    ~/ubuntu_build/ubuntu_rootfs/usr/lib/aarch64-linux-gnu/
+
+# 复制 rknn_server 可执行文件
+sudo cp ${BUILDROOT_TARGET}/usr/bin/rknn_server \
+    ~/ubuntu_build/ubuntu_rootfs/usr/bin/
+
+sudo chmod +x ~/ubuntu_build/ubuntu_rootfs/usr/bin/rknn_server</pre>
+    </div>
+
+    <p>如果 Buildroot 输出中没有现成的库，也可以从 RKNN-Toolkit2 仓库获取预编译版本：</p>
+    <div class="code-block">
+      <div class="code-label"><span class="lang">bash</span><span>开发板上执行（需要网络）</span></div>
+      <pre># 克隆 RKNN-Toolkit2，找到 RK3588 对应的运行库
+git clone --depth=1 https://github.com/airockchip/rknn-toolkit2.git /tmp/rknn-toolkit2
+
+# 复制 librknnrt.so 到系统库目录
+sudo cp /tmp/rknn-toolkit2/rknpu2/runtime/Linux/librknn_api/aarch64/librknnrt.so \
+    /usr/lib/aarch64-linux-gnu/
+sudo ldconfig</pre>
+    </div>
+
+    <p>验证库已正确安装：</p>
+    <div class="code-block">
+      <div class="code-label"><span class="lang">bash</span><span>开发板上执行</span></div>
+      <pre>ldconfig -p | grep librknnrt
+strings /usr/lib/aarch64-linux-gnu/librknnrt.so | grep "librknnrt version"</pre>
+    </div>
+
+    <h3>④ 配置 rknn_server 开机自启服务</h3>
+
+    <p><code>rknn_server</code> 是 NPU 的后台管理进程，建议配置为 systemd 服务开机自动启动：</p>
+    <div class="file-block">
+      <div class="code-label"><span class="lang">写入文件</span><span>/etc/systemd/system/rknn-server.service</span></div>
+      <pre>sudo tee /etc/systemd/system/rknn-server.service &lt;&lt; 'EOF'
+[Unit]
+Description=Rockchip NPU RKNN Server
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/rknn_server
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
+EOF</pre>
+    </div>
+
+    <div class="code-block">
+      <div class="code-label"><span class="lang">bash</span><span>开发板上执行 — 启用并启动服务</span></div>
+      <pre>sudo systemctl daemon-reload
+sudo systemctl enable rknn-server.service
+sudo systemctl start rknn-server.service
+sudo systemctl status rknn-server.service</pre>
+    </div>
+
+    <h3>⑤ 验证 NPU 可用</h3>
+
+    <p>重启后运行以下命令，完整验证 NPU 是否正常工作：</p>
+    <div class="code-block">
+      <div class="code-label"><span class="lang">bash</span><span>开发板上执行</span></div>
+      <pre># 确认设备节点存在
+ls -la /dev/rknpu*
+
+# 确认内核驱动加载（静态编译时 lsmod 不显示，但设备节点存在即正常）
+dmesg | grep -i rknpu
+
+# 确认运行库版本
+strings /usr/lib/aarch64-linux-gnu/librknnrt.so | grep "librknnrt version"
+
+# 确认 rknn_server 运行中
+systemctl is-active rknn-server.service</pre>
+    </div>
+  </section>
+
+  <!-- ===== S10 ===== -->
+  <section class="section" id="s10">
+    <div class="section-header">
+      <div class="step-num">10</div>
+      <h2>创建一键驱动加载启动服务</h2>
+    </div>
+
+    <p>将所有驱动加载、权限设置、rfkill 解锁等操作整合到一个 systemd 服务中，确保每次开机全自动完成。</p>
+
+    <h3>① 创建驱动加载脚本</h3>
+
+    <div class="script-file">
+      <div class="script-file-header">
+        <div class="file-dot" style="background:#ff5f56"></div>
+        <div class="file-dot" style="background:#ffbd2e"></div>
+        <div class="file-dot" style="background:#27c93f"></div>
+        <span class="filename">/usr/local/bin/rk3588-load-drivers.sh</span>
+      </div>
+      <pre>#!/bin/bash
+# ATK-DLRK3588 板载驱动自动加载脚本
+# 每次开机由 systemd 自动执行
+
+LOG="/var/log/rk3588-drivers.log"
+echo "=== $(date) === RK3588 驱动加载开始 ===" >> $LOG
+
+load_module() {
+    local mod=$1
+    if modinfo "$mod" &>/dev/null; then
+        modprobe "$mod" && echo "[OK]  $mod" >> $LOG || echo "[ERR] $mod" >> $LOG
+    else
+        echo "[SKP] $mod (模块不存在)" >> $LOG
+    fi
+}
+
+# ====== GPU ======
+load_module bifrost_kbase
+load_module mali_kbase
+
+# ====== 显示 ======
+load_module rockchipdrm
+load_module dw_hdmi_cec
+
+# ====== 以太网 ======
+load_module rk_gmac_dwmac
+load_module motorcomm
+
+# ====== WiFi ======
+load_module rtl8xxxu
+load_module 8733bu
+
+# ====== 蓝牙 ======
+load_module btusb
+load_module bluetooth
+load_module hci_uart
+
+# ====== 音频 ======
+load_module snd_soc_es8388
+load_module snd_soc_rockchip_i2s
+
+# ====== 视频编解码 ======
+load_module rk_vcodec
+
+# ====== NPU ======
+load_module rknpu
+
+# ====== 摄像头 ======
+load_module video_rkisp
+load_module rkisp_hw
+
+# ====== 其他 ======
+load_module pwm_rockchip
+load_module rockchip_saradc
+
+# ====== 权限设置 ======
+sleep 1
+chmod 666 /dev/dri/renderD128 2>/dev/null
+chmod 666 /dev/mali0 2>/dev/null
+chmod 666 /dev/mpp_service 2>/dev/null
+chmod 666 /dev/rknpu* 2>/dev/null
+
+# ====== 解除 rfkill 封锁 ======
+rfkill unblock all 2>/dev/null
+
+echo "=== $(date) === 驱动加载完成 ===" >> $LOG</pre>
+    </div>
+
+    <div class="code-block">
+      <div class="code-label"><span class="lang">bash</span><span>开发板上执行</span></div>
+      <pre>sudo chmod +x /usr/local/bin/rk3588-load-drivers.sh</pre>
+    </div>
+
+    <h3>② 创建 systemd 服务</h3>
+
+    <div class="file-block">
+      <div class="code-label"><span class="lang">写入文件</span><span>/etc/systemd/system/rk3588-drivers.service</span></div>
+      <pre>sudo tee /etc/systemd/system/rk3588-drivers.service &lt;&lt; 'EOF'
+[Unit]
+Description=ATK-DLRK3588 板载外设驱动自动加载
+DefaultDependencies=no
+After=systemd-modules-load.service local-fs.target
+Before=network-pre.target bluetooth.target sound.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/rk3588-load-drivers.sh
+RemainAfterExit=yes
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
+EOF</pre>
+    </div>
+
+    <h3>③ 启用并启动服务</h3>
+    <div class="code-block">
+      <div class="code-label"><span class="lang">bash</span><span>开发板上执行</span></div>
+      <pre>sudo systemctl daemon-reload
+sudo systemctl enable rk3588-drivers.service
+sudo systemctl start rk3588-drivers.service
+sudo systemctl status rk3588-drivers.service</pre>
+    </div>
+
+    <div class="callout success">
+      <span class="callout-icon">✅</span>
+      <div class="callout-content">
+        <strong>服务启用后，每次开机都会自动执行驱动加载脚本。</strong>加载日志保存在 <code>/var/log/rk3588-drivers.log</code>，可随时查阅。
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== S10 ===== -->
+  <section class="section" id="s11">
+    <div class="section-header">
+      <div class="step-num">11</div>
+      <h2>验证与常见问题排查</h2>
+    </div>
+
+    <h3>① 重启后全面验证</h3>
+    <div class="code-block">
+      <div class="code-label"><span class="lang">bash</span><span>重启后在开发板上执行</span></div>
+      <pre>sudo reboot</pre>
+    </div>
+
+    <div class="code-block">
+      <div class="code-label"><span class="lang">bash</span><span>重启完成后执行</span></div>
+      <pre># 查看驱动加载日志
+cat /var/log/rk3588-drivers.log
+
+# 查看服务状态
+sudo systemctl status rk3588-drivers.service
+
+# 检查已加载模块
+lsmod | grep -E "mali|rtl|motorcomm|gmac|bt|snd_soc_es|rk_v|rkisp|rknpu"
+
+# 检查各外设
+echo "=== 网卡 ==="; ip link show
+echo "=== 蓝牙 ==="; hciconfig -a 2>/dev/null
+echo "=== GPU ===" ; ls /dev/dri/ /dev/mali* 2>/dev/null
+echo "=== 声卡 ==="; cat /proc/asound/cards
+echo "=== 摄像头 ==="; ls /dev/video* 2>/dev/null</pre>
+    </div>
+
+    <h3>② 常见问题排查</h3>
+
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>现象</th><th>原因</th><th>解决方案</th></tr></thead>
+        <tbody>
+          <tr>
+            <td>WiFi 无 wlan0 接口</td>
+            <td>RTL8733BU 驱动未加载 / 固件缺失</td>
+            <td>执行 <code>lsusb</code> 确认USB识别；安装 <code>linux-firmware</code>；检查 <code>dmesg | grep rtl</code></td>
+          </tr>
+          <tr>
+            <td>蓝牙设备不存在</td>
+            <td>rfkill 封锁 / btusb 未加载</td>
+            <td><code>rfkill unblock all</code>；<code>modprobe btusb</code>；检查 <code>dmesg | grep -i bluetooth</code></td>
+          </tr>
+          <tr>
+            <td>/dev/mali0 不存在</td>
+            <td>Mali 内核模块未加载</td>
+            <td><code>find /lib/modules/$(uname -r)/ -name "*mali*"</code>；确认模块名后加入 modules-load.d</td>
+          </tr>
+          <tr>
+            <td>HDMI 无输出</td>
+            <td>rockchipdrm / dw_hdmi 未加载</td>
+            <td><code>dmesg | grep -i hdmi</code>；<code>modprobe rockchipdrm</code>；确认 DRM 设备 <code>ls /dev/dri/</code></td>
+          </tr>
+          <tr>
+            <td>声卡不存在</td>
+            <td>snd_soc_es8388 未加载</td>
+            <td><code>modprobe snd_soc_es8388</code>；检查 I2C 设备 <code>ls /dev/i2c-*</code></td>
+          </tr>
+          <tr>
+            <td>模块加载报错 "not found"</td>
+            <td>模块文件不在当前内核目录中</td>
+            <td>重新执行 <code>make modules_install</code> 安装内核模块；确认 <code>uname -r</code> 与编译版本一致</td>
+          </tr>
+          <tr>
+            <td>eth0 无法获取 IP</td>
+            <td>NetworkManager 未管理有线网卡</td>
+            <td>修改 <code>/usr/lib/NetworkManager/conf.d/10-globally-managed-devices.conf</code>，添加 except:type:ethernet</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>③ 查看 systemd 服务加载日志</h3>
+    <div class="code-block">
+      <div class="code-label"><span class="lang">bash</span><span>开发板上执行</span></div>
+      <pre>sudo journalctl -u rk3588-drivers.service --no-pager
+sudo journalctl -u systemd-modules-load.service --no-pager</pre>
+    </div>
+
+    <div class="callout tip">
+      <span class="callout-icon">💡</span>
+      <div class="callout-content">
+        <strong>最终检查命令：</strong>运行以下一行命令，可以快速看到所有外设的整体状态：
+        <br><br>
+        <code>lsmod | grep -cE "mali|rtl|motorcomm|gmac|btusb|snd_soc_es|rknpu" && echo "驱动加载正常" || echo "部分驱动缺失"</code>
+      </div>
+    </div>
+  </section>
+
+  <hr>
+
+  <div class="callout success">
+    <span class="callout-icon">🎉</span>
+    <div class="callout-content">
+      <strong>配置完成！</strong>重启后系统将自动完成以下所有工作：
+      <ul style="list-style:disc;padding-left:20px;margin-top:8px;font-size:13px;line-height:2">
+        <li>systemd-modules-load 读取 <code>/etc/modules-load.d/rk3588-drivers.conf</code> 加载全部模块</li>
+        <li>rk3588-drivers.service 执行加载脚本，处理权限和 rfkill 解锁</li>
+        <li>NetworkManager 自动管理 eth0/eth1/wlan0</li>
+        <li>bluetooth.service 启动蓝牙协议栈</li>
+        <li>alsa-restore 恢复音频音量设置</li>
+      </ul>
+    </div>
+  </div>
+
+</div>
+
+<footer>
+  <p>适用于：正点原子 ATK-DLRK3588 开发板 · Ubuntu 22.04 LTS · RK3588 SoC</p>
+  <p style="margin-top:6px;color:#30363d">如模块名与实际不符，请以 <code>find /lib/modules/$(uname -r)/ -name "*.ko"</code> 实际输出为准</p>
+</footer>
+
+</body>
+</html>
