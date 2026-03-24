@@ -80,6 +80,7 @@
             <li><a href="#part4">第四部分：底层代码详解</a></li>
             <li><a href="#part5">第五部分：ROS2导航配置</a></li>
             <li><a href="#part6">第六部分：故障排查手册</a></li>
+            <li><a href="#part7" style="color: #f59e0b; font-weight: bold;">第七部分：CPG+CHAMP步态控制</a></li>
         </ul>
     </aside>
 
@@ -1605,9 +1606,870 @@ ros2 bag play test</code></pre>
             </div>
         </section>
 
+        <!-- 第七部分：CPG+CHAMP步态控制 -->
+        <section class="section" id="part7">
+            <h2>第七部分：CPG+CHAMP步态控制方案</h2>
+            <p>本部分介绍基于<strong>CPG（中枢模式发生器）+ 强化学习微调 + CHAMP控制器</strong>的混合步态控制方案，实现类似真实狗的自然运动。</p>
+
+            <h3>7.1 CPG中枢模式发生器原理</h3>
+            
+            <h4>7.1.1 什么是CPG</h4>
+            <p>CPG是生物脊髓中的神经振荡器网络，能够产生节律性的运动模式。四足动物的行走、小跑、奔跑等步态都是由CPG控制的。</p>
+
+            <div class="info-box tip">
+                <b>💡 CPG优势</b><br>
+                1. 参数少，计算量小（适合RK3588嵌入式部署）<br>
+                2. 天然产生平滑的周期性运动<br>
+                3. 易于实现多种步态切换<br>
+                4. 与生物运动机理一致，运动自然
+            </div>
+
+            <h4>7.1.2 Hopf振荡器模型</h4>
+            <p>Hopf振荡器是最常用的CPG模型，其数学表达式为：</p>
+            <pre><code># Hopf振荡器微分方程
+dx/dt = α(μ - r²)x - ωy
+dy/dt = α(μ - r²)y + ωx
+
+其中：
+- r² = x² + y²（振荡器幅值）
+- μ：目标幅值的平方
+- ω：振荡频率
+- α：收敛速度系数</code></pre>
+
+            <h4>7.1.3 四足CPG网络结构</h4>
+            <p>四足机器人需要4个CPG单元（每条腿一个），通过耦合矩阵实现相位协调：</p>
+            <pre><code># 四足CPG耦合矩阵（Trot步态）
+# 对角腿同相（0°），相邻腿反相（180°）
+
+耦合矩阵 C = [
+    [0,   π,   0,   π  ],   # LF腿相位关系
+    [π,   0,   π,   0  ],   # RF腿相位关系
+    [0,   π,   0,   π  ],   # LH腿相位关系
+    [π,   0,   π,   0  ]    # RH腿相位关系
+]
+
+# 相位定义
+# LF（左前）= 0°
+# RF（右前）= 180°
+# LH（左后）= 0°
+# RH（右后）= 180°</code></pre>
+
+            <h3>7.2 CPG代码实现（Python）</h3>
+
+            <h4>7.2.1 Hopf振荡器类</h4>
+            <pre><code># cpg/hopf_oscillator.py
+import numpy as np
+
+class HopfOscillator:
+    """Hopf振荡器 - CPG核心单元"""
+    
+    def __init__(self, mu=1.0, omega=2*np.pi, alpha=50.0):
+        """
+        初始化Hopf振荡器
+        
+        Args:
+            mu: 目标幅值的平方
+            omega: 基础频率 (rad/s)
+            alpha: 收敛速度
+        """
+        self.mu = mu
+        self.omega = omega
+        self.alpha = alpha
+        self.x = 0.1  # 初始状态（非零启动）
+        self.y = 0.0
+        
+    def step(self, dt, omega_modifier=1.0, coupling_input=0.0):
+        """
+        单步积分
+        
+        Args:
+            dt: 时间步长
+            omega_modifier: 频率调节系数
+            coupling_input: 来自其他振荡器的耦合输入
+        """
+        # 计算当前幅值
+        r_squared = self.x**2 + self.y**2
+        
+        # 动态频率
+        omega = self.omega * omega_modifier
+        
+        # Hopf方程
+        dx = self.alpha * (self.mu - r_squared) * self.x - omega * self.y + coupling_input
+        dy = self.alpha * (self.mu - r_squared) * self.y + omega * self.x
+        
+        # 欧拉积分
+        self.x += dx * dt
+        self.y += dy * dt
+        
+        return self.x, self.y
+    
+    def get_output(self):
+        """获取当前输出（x为位置信号，y为速度信号）"""
+        return self.x, self.y
+    
+    def reset(self):
+        """重置振荡器状态"""
+        self.x = 0.1
+        self.y = 0.0</code></pre>
+
+            <h4>7.2.2 CPG网络管理器</h4>
+            <pre><code># cpg/cpg_network.py
+import numpy as np
+from hopf_oscillator import HopfOscillator
+
+class CPGNetwork:
+    """四足CPG网络管理器"""
+    
+    # 腿索引定义
+    LF = 0  # 左前
+    RF = 1  # 右前
+    LH = 2  # 左后
+    RH = 3  # 右后
+    
+    # 步态相位配置（弧度）
+    GAIT_PHASES = {
+        'walk':  [0, np.pi, np.pi/2, 3*np.pi/2],      # 行走：相位差90°
+        'trot':  [0, np.pi, 0, np.pi],                # 小跑：对角同相
+        'pace':  [0, 0, np.pi, np.pi],                # 侧步：同侧同相
+        'bound': [0, 0, np.pi, np.pi],                # 跳跃：前后同相
+        'gallop':[0, np.pi/4, np.pi/2, 3*np.pi/4]     # 奔跑：连续相位
+    }
+    
+    def __init__(self, gait='trot', frequency=2.0, amplitude=0.05):
+        """
+        初始化CPG网络
+        
+        Args:
+            gait: 步态类型 ('walk', 'trot', 'pace', 'bound')
+            frequency: 步态频率 (Hz)
+            amplitude: 摆动幅值 (m)
+        """
+        self.gait = gait
+        self.frequency = frequency
+        self.amplitude = amplitude
+        
+        # 创建4个Hopf振荡器
+        omega = 2 * np.pi * frequency
+        self.oscillators = [
+            HopfOscillator(mu=amplitude**2, omega=omega)
+            for _ in range(4)
+        ]
+        
+        # 设置目标相位
+        self.target_phases = self.GAIT_PHASES[gait]
+        self.current_phases = np.zeros(4)
+        
+        # 耦合强度
+        self.coupling_strength = 0.5
+        
+    def compute_coupling(self):
+        """计算振荡器间的耦合输入"""
+        coupling_inputs = np.zeros(4)
+        
+        for i in range(4):
+            for j in range(4):
+                if i != j:
+                    # 相位差耦合
+                    phase_diff = self.target_phases[i] - self.target_phases[j]
+                    coupling_inputs[i] += self.coupling_strength * np.sin(
+                        self.current_phases[j] - self.current_phases[i] - phase_diff
+                    )
+        
+        return coupling_inputs
+    
+    def step(self, dt, freq_modifier=1.0, amp_modifier=1.0):
+        """
+        CPG网络单步更新
+        
+        Args:
+            dt: 时间步长
+            freq_modifier: 频率调节（用于速度控制）
+            amp_modifier: 幅值调节（用于步幅控制）
+        
+        Returns:
+            positions: 4条腿的x位置输出
+            velocities: 4条腿的y速度输出
+        """
+        # 计算耦合输入
+        coupling_inputs = self.compute_coupling()
+        
+        positions = []
+        velocities = []
+        
+        for i, osc in enumerate(self.oscillators):
+            # 更新振荡器
+            osc.mu = (self.amplitude * amp_modifier) ** 2
+            x, y = osc.step(dt, freq_modifier, coupling_inputs[i])
+            
+            positions.append(x)
+            velocities.append(y)
+            
+            # 更新相位估计
+            self.current_phases[i] = np.arctan2(y, x)
+        
+        return np.array(positions), np.array(velocities)
+    
+    def set_gait(self, gait):
+        """切换步态"""
+        if gait in self.GAIT_PHASES:
+            self.gait = gait
+            self.target_phases = self.GAIT_PHASES[gait]
+    
+    def set_frequency(self, frequency):
+        """设置步态频率"""
+        self.frequency = frequency
+        omega = 2 * np.pi * frequency
+        for osc in self.oscillators:
+            osc.omega = omega
+    
+    def reset(self):
+        """重置所有振荡器"""
+        for osc in self.oscillators:
+            osc.reset()
+        self.current_phases = np.zeros(4)</code></pre>
+
+            <h3>7.3 强化学习微调CPG参数</h3>
+
+            <h4>7.3.1 RL环境设计</h4>
+            <pre><code># rl/cpg_rl_env.py
+import gym
+from gym import spaces
+import numpy as np
+import pybullet as p
+import pybullet_data
+
+from cpg_network import CPGNetwork
+
+class CPGQuadEnv(gym.Env):
+    """CPG+RL四足机器人环境"""
+    
+    def __init__(self, render=False):
+        super().__init__()
+        
+        # PyBullet连接
+        if render:
+            self.physics_client = p.connect(p.GUI)
+        else:
+            self.physics_client = p.connect(p.DIRECT)
+        
+        p.setAdditionalSearchPath(pybullet_data.getDataPath())
+        
+        # CPG网络
+        self.cpg = CPGNetwork(gait='trot', frequency=2.0, amplitude=0.05)
+        
+        # RL动作空间：CPG参数调节
+        # [频率调节, 幅值调节, 步态偏移x4, 膝关节增益]
+        self.action_space = spaces.Box(
+            low=np.array([0.5, 0.5, -0.1, -0.1, -0.1, -0.1, 0.5]),
+            high=np.array([2.0, 2.0, 0.1, 0.1, 0.1, 0.1, 2.0]),
+            dtype=np.float32
+        )
+        
+        # 观测空间
+        self.observation_space = spaces.Box(
+            low=-np.inf, high=np.inf, shape=(28,), dtype=np.float32
+        )
+        
+        self.robot_id = None
+        self.time_step = 0.001
+        self.max_steps = 1000
+        self.current_step = 0
+        
+    def reset(self):
+        """重置环境"""
+        p.resetSimulation()
+        p.setGravity(0, 0, -9.81)
+        p.setTimeStep(self.time_step)
+        
+        # 加载地面
+        self.plane_id = p.loadURDF("plane.urdf")
+        
+        # 加载机器人（使用A1 URDF）
+        self.robot_id = p.loadURDF(
+            "a1/a1.urdf",
+            [0, 0, 0.35],
+            p.getQuaternionFromEuler([0, 0, 0])
+        )
+        
+        # 重置CPG
+        self.cpg.reset()
+        
+        self.current_step = 0
+        
+        return self._get_observation()
+    
+    def step(self, action):
+        """执行动作"""
+        # 解析RL动作
+        freq_mod = action[0]      # 频率调节
+        amp_mod = action[1]       # 幅值调节
+        foot_offsets = action[2:6]  # 足端位置偏移
+        knee_gain = action[6]     # 膝关节增益
+        
+        # CPG生成步态
+        cpg_pos, cpg_vel = self.cpg.step(self.time_step, freq_mod, amp_mod)
+        
+        # 应用CPG输出到机器人关节
+        for leg_idx in range(4):
+            # 将CPG输出映射到髋关节和膝关节
+            hip_angle = cpg_pos[leg_idx] * 0.5  # 髋关节摆动
+            knee_angle = abs(cpg_pos[leg_idx]) * knee_gain + foot_offsets[leg_idx]
+            
+            # 设置关节位置（简化示例）
+            # 实际应根据逆运动学计算
+            p.setJointMotorControl2(
+                self.robot_id,
+                leg_idx * 3,  # 假设每腿3个关节
+                p.POSITION_CONTROL,
+                targetPosition=hip_angle
+            )
+        
+        # 仿真步进
+        p.stepSimulation()
+        
+        # 获取观测
+        obs = self._get_observation()
+        
+        # 计算奖励
+        reward = self._compute_reward()
+        
+        # 检查终止条件
+        done = self._check_done()
+        
+        self.current_step += 1
+        
+        return obs, reward, done, {}
+    
+    def _get_observation(self):
+        """获取观测值"""
+        # 获取机器人状态
+        pos, orn = p.getBasePositionAndOrientation(self.robot_id)
+        vel, ang_vel = p.getBaseVelocity(self.robot_id)
+        
+        # 组合观测
+        obs = np.concatenate([
+            pos,                    # 位置 (3)
+            p.getEulerFromQuaternion(orn),  # 姿态 (3)
+            vel,                    # 线速度 (3)
+            ang_vel,                # 角速度 (3)
+            self.cpg.current_phases, # CPG相位 (4)
+            self.cpg.oscillators[0].get_output()  # 参考CPG输出 (2)
+        ])
+        
+        return obs.astype(np.float32)
+    
+    def _compute_reward(self):
+        """计算奖励函数"""
+        # 获取状态
+        pos, orn = p.getBasePositionAndOrientation(self.robot_id)
+        vel, _ = p.getBaseVelocity(self.robot_id)
+        
+        # 前进速度奖励
+        forward_reward = vel[0] * 1.0
+        
+        # 高度保持奖励
+        height_reward = -abs(pos[2] - 0.3) * 10.0
+        
+        # 姿态稳定奖励
+        roll, pitch, _ = p.getEulerFromQuaternion(orn)
+        stability_reward = -(roll**2 + pitch**2) * 5.0
+        
+        # 能量效率奖励（惩罚大动作）
+        action_penalty = -np.sum(np.square(self.last_action)) * 0.01
+        
+        return forward_reward + height_reward + stability_reward + action_penalty
+    
+    def _check_done(self):
+        """检查是否终止"""
+        pos, _ = p.getBasePositionAndOrientation(self.robot_id)
+        
+        # 摔倒检测
+        if pos[2] < 0.15:
+            return True
+        
+        # 步数限制
+        if self.current_step >= self.max_steps:
+            return True
+        
+        return False
+    
+    def close(self):
+        p.disconnect()</code></pre>
+
+            <h4>7.3.2 PPO训练脚本</h4>
+            <pre><code># rl/train_cpg_rl.py
+import gym
+from stable_baselines3 import PPO
+from stable_baselines3.common.callbacks import CheckpointCallback
+from cpg_rl_env import CPGQuadEnv
+
+def train():
+    """训练CPG+RL策略"""
+    
+    # 创建环境
+    env = CPGQuadEnv(render=False)
+    
+    # PPO模型配置
+    model = PPO(
+        "MlpPolicy",
+        env,
+        verbose=1,
+        learning_rate=3e-4,
+        n_steps=2048,
+        batch_size=64,
+        n_epochs=10,
+        gamma=0.99,
+        gae_lambda=0.95,
+        clip_range=0.2,
+        ent_coef=0.01,
+        policy_kwargs=dict(
+            net_arch=[dict(pi=[256, 256], vf=[256, 256])]
+        )
+    )
+    
+    # 检查点回调
+    checkpoint_callback = CheckpointCallback(
+        save_freq=10000,
+        save_path="./checkpoints/",
+        name_prefix="cpg_rl_model"
+    )
+    
+    # 训练
+    model.learn(
+        total_timesteps=5_000_000,
+        callback=checkpoint_callback
+    )
+    
+    # 保存最终模型
+    model.save("cpg_rl_final")
+    
+    env.close()
+
+def test():
+    """测试训练好的模型"""
+    
+    env = CPGQuadEnv(render=True)
+    model = PPO.load("cpg_rl_final")
+    
+    obs = env.reset()
+    for _ in range(1000):
+        action, _ = model.predict(obs, deterministic=True)
+        obs, reward, done, _ = env.step(action)
+        
+        if done:
+            obs = env.reset()
+    
+    env.close()
+
+if __name__ == "__main__":
+    # train()
+    test()</code></pre>
+
+            <h3>7.4 CHAMP控制器集成</h3>
+
+            <h4>7.4.1 CHAMP简介</h4>
+            <p>CHAMP是基于MIT Cheetah I的开源四足机器人控制框架，支持ROS2，具备完整的步态控制和导航能力。</p>
+
+            <div class="info-box tip">
+                <b>💡 CHAMP特点</b><br>
+                1. 轻量级C++库，可在RK3588上实时运行<br>
+                2. 支持多种步态（Walk/Trot/Pace/Bound）<br>
+                3. 内置逆运动学和平衡控制<br>
+                4. 完整的ROS2导航集成
+            </div>
+
+            <h4>7.4.2 安装CHAMP</h4>
+            <pre><code># 1. 创建工作空间
+mkdir -p ~/champ_ws/src
+cd ~/champ_ws/src
+
+# 2. 克隆CHAMP仓库
+git clone --recursive https://github.com/chvmp/champ.git
+git clone https://github.com/chvmp/champ_teleop.git
+
+# 3. 安装依赖
+cd ~/champ_ws
+rosdep install --from-paths src --ignore-src -r -y
+
+# 4. 编译
+colcon build --symlink-install
+source install/setup.bash</code></pre>
+
+            <h4>7.4.3 配置自定义机器人</h4>
+            <pre><code># 使用champ_setup_assistant生成配置
+ros2 run champ_setup_assistant setup_assistant
+
+# 配置参数：
+# - 机器人名称: atk_quadruped
+# - URDF路径: ~/atk_quadruped/urdf/robot.urdf
+# - 关节映射:
+#   LF_HIP, LF_THIGH, LF_CALF
+#   RF_HIP, RF_THIGH, RF_CALF
+#   LH_HIP, LH_THIGH, LH_CALF
+#   RH_HIP, RH_THIGH, RH_CALF</code></pre>
+
+            <h4>7.4.4 gait.yaml步态配置</h4>
+            <pre><code># config/gait.yaml - CHAMP步态配置文件
+gait:
+  # 膝关节方向配置
+  # .>> = 所有膝盖向前
+  # .<> = 左前右后向前，右前左后向后
+  knee_orientation: ".>>"
+  
+  # 最大速度限制
+  max_linear_velocity_x: 0.5    # 前进速度 (m/s)
+  max_linear_velocity_y: 0.3    # 横向速度 (m/s)
+  max_angular_velocity_z: 1.0   # 旋转速度 (rad/s)
+  
+  # 步态时序参数
+  stance_duration: 0.3          # 支撑相持续时间 (s)
+  leg_swing_height: 0.08        # 摆动腿抬升高度 (m)
+  leg_stance_height: 0.0        # 支撑腿高度偏移 (m)
+  
+  # 机身高度
+  robot_walking_height: 0.25    # 行走时机身高度 (m)
+  
+  # 重心偏移补偿
+  com_x_translation: 0.02       # X方向偏移 (m)
+  com_y_translation: 0.0        # Y方向偏移 (m)
+  
+  # 里程计校准
+  odometry_scaler: 1.0          # 里程计缩放因子
+  
+  # 不同步态的频率配置
+  walk:
+    frequency: 1.0              # 行走步态频率 (Hz)
+    duty_factor: 0.75           # 支撑相占比
+  
+  trot:
+    frequency: 2.0              # 小跑步态频率 (Hz)
+    duty_factor: 0.5            # 对角腿支撑
+  
+  pace:
+    frequency: 2.5              # 侧步步态频率 (Hz)
+    duty_factor: 0.5            # 同侧腿支撑
+  
+  bound:
+    frequency: 3.0              # 跳跃步态频率 (Hz)
+    duty_factor: 0.4            # 前后腿分组</code></pre>
+
+            <h4>7.4.5 CPG与CHAMP融合节点</h4>
+            <pre><code># ros2_ws/src/atk_quadruped/atk_quadruped/cpg_champ_bridge.py
+#!/usr/bin/env python3
+"""
+CPG-CHAMP桥接节点
+将CPG生成的节律信号转换为CHAMP控制器命令
+"""
+
+import rclpy
+from rclpy.node import Node
+from geometry_msgs.msg import Twist, Pose
+from sensor_msgs.msg import JointState
+from nav_msgs.msg import Odometry
+import numpy as np
+import sys
+sys.path.append('/home/atk/atk_quadruped/cpg')
+from cpg_network import CPGNetwork
+
+class CPGChampBridge(Node):
+    def __init__(self):
+        super().__init__('cpg_champ_bridge')
+        
+        # CPG网络
+        self.cpg = CPGNetwork(gait='trot', frequency=2.0, amplitude=0.05)
+        
+        # 状态变量
+        self.current_gait = 'trot'
+        self.target_velocity = np.array([0.0, 0.0, 0.0])  # [vx, vy, wz]
+        self.current_velocity = np.array([0.0, 0.0, 0.0])
+        
+        # ROS2订阅/发布
+        self.cmd_vel_sub = self.create_subscription(
+            Twist, '/cmd_vel', self.cmd_vel_callback, 10
+        )
+        
+        self.odom_sub = self.create_subscription(
+            Odometry, '/odom', self.odom_callback, 10
+        )
+        
+        self.joint_pub = self.create_publisher(
+            JointState, '/joint_states', 10
+        )
+        
+        # 控制循环定时器 (100Hz)
+        self.timer = self.create_timer(0.01, self.control_loop)
+        
+        # RL策略（可选）
+        self.use_rl = True
+        if self.use_rl:
+            from stable_baselines3 import PPO
+            self.rl_model = PPO.load('/home/atk/models/cpg_rl_final')
+            self.rl_obs = np.zeros(28)
+        
+        self.get_logger().info('CPG-CHAMP桥接节点已启动')
+    
+    def cmd_vel_callback(self, msg):
+        """接收速度指令"""
+        self.target_velocity = np.array([
+            msg.linear.x,
+            msg.linear.y,
+            msg.angular.z
+        ])
+        
+        # 根据速度选择步态
+        speed = np.linalg.norm(self.target_velocity[:2])
+        if speed < 0.1:
+            new_gait = 'walk'
+        elif speed < 0.3:
+            new_gait = 'trot'
+        else:
+            new_gait = 'pace'
+        
+        if new_gait != self.current_gait:
+            self.cpg.set_gait(new_gait)
+            self.current_gait = new_gait
+            self.get_logger().info(f'切换步态: {new_gait}')
+    
+    def odom_callback(self, msg):
+        """接收里程计数据"""
+        self.current_velocity = np.array([
+            msg.twist.twist.linear.x,
+            msg.twist.twist.linear.y,
+            msg.twist.twist.angular.z
+        ])
+    
+    def control_loop(self):
+        """主控制循环"""
+        # 计算速度误差
+        vel_error = self.target_velocity - self.current_velocity
+        
+        # 基础CPG参数
+        speed = np.linalg.norm(self.target_velocity[:2])
+        freq_mod = 0.5 + speed * 2.0  # 速度越快频率越高
+        amp_mod = 0.5 + speed * 1.5   # 速度越快步幅越大
+        
+        # RL微调（如果启用）
+        if self.use_rl:
+            # 更新RL观测
+            self.rl_obs[:3] = self.current_velocity
+            self.rl_obs[3:6] = vel_error
+            
+            # RL推理
+            action, _ = self.rl_model.predict(self.rl_obs, deterministic=True)
+            
+            # 应用RL调节
+            freq_mod *= action[0]
+            amp_mod *= action[1]
+            foot_offsets = action[2:6]
+            knee_gain = action[6]
+        else:
+            foot_offsets = np.zeros(4)
+            knee_gain = 1.0
+        
+        # CPG步进
+        cpg_pos, cpg_vel = self.cpg.step(0.01, freq_mod, amp_mod)
+        
+        # 转换为关节角度（简化逆运动学）
+        joint_angles = self.cpg_to_joints(cpg_pos, foot_offsets, knee_gain)
+        
+        # 发布关节状态
+        joint_msg = JointState()
+        joint_msg.header.stamp = self.get_clock().now().to_msg()
+        joint_msg.name = [
+            'LF_HIP', 'LF_THIGH', 'LF_CALF',
+            'RF_HIP', 'RF_THIGH', 'RF_CALF',
+            'LH_HIP', 'LH_THIGH', 'LH_CALF',
+            'RH_HIP', 'RH_THIGH', 'RH_CALF'
+        ]
+        joint_msg.position = joint_angles.tolist()
+        
+        self.joint_pub.publish(joint_msg)
+    
+    def cpg_to_joints(self, cpg_pos, offsets, knee_gain):
+        """
+        将CPG输出转换为关节角度
+        
+        Args:
+            cpg_pos: CPG位置输出 (4,)
+            offsets: 足端偏移 (4,)
+            knee_gain: 膝关节增益
+        
+        Returns:
+            joint_angles: 12个关节角度
+        """
+        joint_angles = np.zeros(12)
+        
+        for leg in range(4):
+            # CPG信号
+            x = cpg_pos[leg] + offsets[leg]
+            
+            # 髋关节（摆动）
+            hip_angle = x * 0.4  # 缩放因子
+            
+            # 大腿关节
+            thigh_angle = abs(x) * 0.3
+            
+            # 小腿关节（膝关节）
+            calf_angle = -abs(x) * 0.8 * knee_gain
+            
+            # 赋值
+            joint_idx = leg * 3
+            joint_angles[joint_idx] = hip_angle      # HIP
+            joint_angles[joint_idx + 1] = thigh_angle  # THIGH
+            joint_angles[joint_idx + 2] = calf_angle   # CALF
+        
+        return joint_angles
+
+def main(args=None):
+    rclpy.init(args=args)
+    node = CPGChampBridge()
+    
+    try:
+        rclpy.spin(node)
+    except KeyboardInterrupt:
+        pass
+    
+    node.destroy_node()
+    rclpy.shutdown()
+
+if __name__ == '__main__':
+    main()</code></pre>
+
+            <h3>7.5 RK3588部署配置</h3>
+
+            <h4>7.5.1 系统服务配置</h4>
+            <pre><code># /etc/systemd/system/atk_quadruped.service
+[Unit]
+Description=ATK Quadruped Robot CPG+CHAMP Controller
+After=network.target
+
+[Service]
+Type=simple
+User=atk
+WorkingDirectory=/home/atk/atk_quadruped
+Environment="ROS_DOMAIN_ID=42"
+Environment="PYTHONPATH=/home/atk/atk_quadruped"
+
+# 启动CPG-CHAMP桥接节点
+ExecStart=/bin/bash -c 'source /opt/ros/humble/setup.bash && \\
+    source ~/champ_ws/install/setup.bash && \\
+    ros2 run atk_quadruped cpg_champ_bridge'
+
+# 重启策略
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target</code></pre>
+
+            <h4>7.5.2 启动脚本</h4>
+            <pre><code>#!/bin/bash
+# start_robot.sh - 机器狗启动脚本
+
+echo "🐕 启动 ATK-DLRK3588 四足机器狗..."
+
+# 设置ROS2环境
+source /opt/ros/humble/setup.bash
+source ~/champ_ws/install/setup.bash
+source ~/atk_ws/install/setup.bash
+
+# 设置CAN接口
+sudo ip link set can0 up type can bitrate 1000000
+sudo ip link set can1 up type can bitrate 1000000
+
+# 启动CHAMP控制器
+echo "启动CHAMP控制器..."
+ros2 launch atk_quadruped bringup.launch.py &
+PID1=$!
+
+# 等待CHAMP启动
+sleep 3
+
+# 启动CPG-CHAMP桥接
+echo "启动CPG-CHAMP桥接..."
+ros2 run atk_quadruped cpg_champ_bridge &
+PID2=$!
+
+# 启动遥操作（可选）
+echo "启动遥操作节点..."
+ros2 launch champ_teleop teleop.launch.py joy:=true &
+PID3=$!
+
+echo "✅ 机器狗已启动！"
+echo "使用手柄控制或发布/cmd_vel话题"
+echo ""
+echo "常用命令："
+echo "  查看话题: ros2 topic list"
+echo "  发布速度: ros2 topic pub /cmd_vel geometry_msgs/Twist '{linear: {x: 0.2}}'"
+echo "  停止: kill $PID1 $PID2 $PID3"
+
+# 等待中断
+trap "kill $PID1 $PID2 $PID3; exit" SIGINT SIGTERM
+wait</code></pre>
+
+            <h3>7.6 性能优化</h3>
+
+            <h4>7.6.1 RK3588 CPU绑定</h4>
+            <pre><code># 将关键进程绑定到大核（A76）
+# 在启动脚本中添加
+
+# CPG控制循环绑定到CPU 4-5（A76大核）
+taskset -c 4,5 ros2 run atk_quadruped cpg_champ_bridge &
+
+# CHAMP控制器绑定到CPU 6-7
+ taskset -c 6,7 ros2 launch champ_config bringup.launch.py &</code></pre>
+
+            <h4>7.6.2 实时性配置</h4>
+            <pre><code># /etc/security/limits.conf
+# 添加实时优先级权限
+atk soft rtprio 99
+atk hard rtprio 99
+
+# 使用chrt设置实时调度
+chrt -f 99 ros2 run atk_quadruped cpg_champ_bridge</code></pre>
+
+            <h3>7.7 调试与监控</h3>
+
+            <h4>7.7.1 CPG可视化</h4>
+            <pre><code># 使用rqt_plot监控CPG输出
+ros2 run rqt_plot rqt_plot /joint_states/position[0] /joint_states/position[1]
+
+# 或使用命令行查看
+ros2 topic echo /joint_states --field position</code></pre>
+
+            <h4>7.7.2 常见问题排查</h4>
+            <div class="error-box">
+                <b>❌ 问题：CPG输出抖动</b><br>
+                原因：时间步长过大或耦合强度过高<br>
+                解决：减小dt到0.001s，降低coupling_strength到0.3
+            </div>
+            
+            <div class="error-box">
+                <b>❌ 问题：步态切换不流畅</b><br>
+                原因：相位跳变过大<br>
+                解决：使用相位渐变，不要直接重置CPG
+            </div>
+            
+            <div class="error-box">
+                <b>❌ 问题：RL策略不稳定</b><br>
+                原因：观测空间未归一化<br>
+                解决：在环境代码中添加状态归一化层
+            </div>
+
+            <div class="info-box tip">
+                <b>✅ 部署检查清单</b><br>
+                □ CPG参数已校准（频率、幅值）<br>
+                □ RL模型已转换为ONNX格式（可选加速）<br>
+                □ CHAMP gait.yaml配置完成<br>
+                □ CAN通信测试通过<br>
+                □ 急停按钮功能正常<br>
+                □ 日志记录已启用
+            </div>
+        </section>
+
         <div style="text-align: center; padding: 2rem; border-top: 1px solid var(--border); margin-top: 2rem;">
             <p style="color: var(--text2);">ATK-DLRK3588 + STM32H7 四足机器狗开发教程</p>
-            <p style="color: var(--text2); font-size: 0.9rem;">版本: v2.0 | 更新日期: 2026-03-24</p>
+            <p style="color: var(--text2); font-size: 0.9rem;">版本: v3.0 | 更新日期: 2026-03-24 | 新增CPG+CHAMP步态控制</p>
         </div>
     </main>
 
