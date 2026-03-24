@@ -1,0 +1,1383 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ATK-DLRK3588 + STM32H7 四足机器狗开发教程</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        :root {
+            --primary-color: #2563eb;
+            --secondary-color: #1e40af;
+            --accent-color: #3b82f6;
+            --success-color: #10b981;
+            --warning-color: #f59e0b;
+            --danger-color: #ef4444;
+            --dark-bg: #0f172a;
+            --card-bg: #1e293b;
+            --text-primary: #f1f5f9;
+            --text-secondary: #94a3b8;
+            --border-color: #334155;
+            --code-bg: #0d1117;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            color: var(--text-primary);
+            line-height: 1.8;
+            min-height: 100vh;
+        }
+        
+        /* 导航栏 */
+        .navbar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            background: rgba(15, 23, 42, 0.95);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid var(--border-color);
+            z-index: 1000;
+            padding: 1rem 2rem;
+        }
+        
+        .navbar-content {
+            max-width: 1400px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .logo {
+            font-size: 1.5rem;
+            font-weight: bold;
+            background: linear-gradient(135deg, var(--accent-color), var(--success-color));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .nav-links {
+            display: flex;
+            gap: 2rem;
+        }
+        
+        .nav-links a {
+            color: var(--text-secondary);
+            text-decoration: none;
+            transition: color 0.3s;
+        }
+        
+        .nav-links a:hover {
+            color: var(--accent-color);
+        }
+        
+        /* 侧边栏 */
+        .sidebar {
+            position: fixed;
+            left: 0;
+            top: 70px;
+            bottom: 0;
+            width: 300px;
+            background: var(--card-bg);
+            border-right: 1px solid var(--border-color);
+            overflow-y: auto;
+            padding: 1.5rem;
+        }
+        
+        .sidebar-title {
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 1rem;
+        }
+        
+        .sidebar-menu {
+            list-style: none;
+        }
+        
+        .sidebar-menu li {
+            margin-bottom: 0.5rem;
+        }
+        
+        .sidebar-menu a {
+            display: block;
+            padding: 0.5rem 0.75rem;
+            color: var(--text-secondary);
+            text-decoration: none;
+            border-radius: 0.375rem;
+            transition: all 0.3s;
+            font-size: 0.9rem;
+        }
+        
+        .sidebar-menu a:hover {
+            background: rgba(59, 130, 246, 0.1);
+            color: var(--accent-color);
+        }
+        
+        .sidebar-menu a.active {
+            background: var(--primary-color);
+            color: white;
+        }
+        
+        /* 主内容区 */
+        .main-content {
+            margin-left: 300px;
+            margin-top: 70px;
+            padding: 2rem;
+            max-width: 1000px;
+        }
+        
+        /* Hero区域 */
+        .hero {
+            background: linear-gradient(135deg, rgba(37, 99, 235, 0.1) 0%, rgba(16, 185, 129, 0.1) 100%);
+            border: 1px solid var(--border-color);
+            border-radius: 1rem;
+            padding: 3rem;
+            margin-bottom: 3rem;
+            text-align: center;
+        }
+        
+        .hero h1 {
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+            background: linear-gradient(135deg, var(--text-primary), var(--accent-color));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .hero p {
+            color: var(--text-secondary);
+            font-size: 1.125rem;
+            max-width: 600px;
+            margin: 0 auto 2rem;
+        }
+        
+        .hero-badges {
+            display: flex;
+            justify-content: center;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+        
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem 1rem;
+            background: rgba(59, 130, 246, 0.2);
+            border: 1px solid var(--primary-color);
+            border-radius: 2rem;
+            font-size: 0.875rem;
+            color: var(--accent-color);
+        }
+        
+        /* 章节样式 */
+        .section {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 1rem;
+            padding: 2rem;
+            margin-bottom: 2rem;
+        }
+        
+        .section h2 {
+            font-size: 1.875rem;
+            margin-bottom: 1.5rem;
+            padding-bottom: 0.75rem;
+            border-bottom: 2px solid var(--primary-color);
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+        
+        .section h3 {
+            font-size: 1.5rem;
+            margin: 2rem 0 1rem;
+            color: var(--accent-color);
+        }
+        
+        .section h4 {
+            font-size: 1.25rem;
+            margin: 1.5rem 0 0.75rem;
+            color: var(--text-primary);
+        }
+        
+        .section p {
+            margin-bottom: 1rem;
+            color: var(--text-secondary);
+        }
+        
+        /* 架构图 */
+        .architecture-diagram {
+            background: var(--code-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 0.75rem;
+            padding: 1.5rem;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 0.875rem;
+            line-height: 1.6;
+            overflow-x: auto;
+            margin: 1.5rem 0;
+            color: #e6edf3;
+        }
+        
+        /* 表格样式 */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1.5rem 0;
+            background: var(--code-bg);
+            border-radius: 0.5rem;
+            overflow: hidden;
+        }
+        
+        th {
+            background: var(--primary-color);
+            color: white;
+            padding: 1rem;
+            text-align: left;
+            font-weight: 600;
+        }
+        
+        td {
+            padding: 0.875rem 1rem;
+            border-bottom: 1px solid var(--border-color);
+            color: var(--text-secondary);
+        }
+        
+        tr:hover td {
+            background: rgba(59, 130, 246, 0.05);
+        }
+        
+        /* 代码块 */
+        pre {
+            background: var(--code-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 0.75rem;
+            padding: 1.5rem;
+            overflow-x: auto;
+            margin: 1.5rem 0;
+        }
+        
+        code {
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            font-size: 0.875rem;
+            line-height: 1.6;
+        }
+        
+        .code-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.75rem 1rem;
+            background: rgba(59, 130, 246, 0.1);
+            border-bottom: 1px solid var(--border-color);
+            border-radius: 0.75rem 0.75rem 0 0;
+            margin: -1.5rem -1.5rem 1rem -1.5rem;
+        }
+        
+        .code-lang {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            color: var(--accent-color);
+            font-weight: 600;
+        }
+        
+        /* 信息框 */
+        .info-box {
+            padding: 1.25rem;
+            border-radius: 0.75rem;
+            margin: 1.5rem 0;
+            border-left: 4px solid;
+        }
+        
+        .info-box.tip {
+            background: rgba(16, 185, 129, 0.1);
+            border-color: var(--success-color);
+        }
+        
+        .info-box.warning {
+            background: rgba(245, 158, 11, 0.1);
+            border-color: var(--warning-color);
+        }
+        
+        .info-box.danger {
+            background: rgba(239, 68, 68, 0.1);
+            border-color: var(--danger-color);
+        }
+        
+        .info-box-title {
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .info-box.tip .info-box-title { color: var(--success-color); }
+        .info-box.warning .info-box-title { color: var(--warning-color); }
+        .info-box.danger .info-box-title { color: var(--danger-color); }
+        
+        /* 列表样式 */
+        ul, ol {
+            margin: 1rem 0;
+            padding-left: 1.5rem;
+        }
+        
+        li {
+            margin-bottom: 0.5rem;
+            color: var(--text-secondary);
+        }
+        
+        /* 流程图 */
+        .flowchart {
+            background: var(--code-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 0.75rem;
+            padding: 1.5rem;
+            margin: 1.5rem 0;
+            font-family: monospace;
+        }
+        
+        /* 特性卡片 */
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1.5rem;
+            margin: 1.5rem 0;
+        }
+        
+        .feature-card {
+            background: var(--code-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 0.75rem;
+            padding: 1.5rem;
+            transition: transform 0.3s, border-color 0.3s;
+        }
+        
+        .feature-card:hover {
+            transform: translateY(-4px);
+            border-color: var(--primary-color);
+        }
+        
+        .feature-icon {
+            width: 48px;
+            height: 48px;
+            background: linear-gradient(135deg, var(--primary-color), var(--accent-color));
+            border-radius: 0.75rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+        }
+        
+        .feature-card h4 {
+            margin: 0 0 0.5rem 0;
+            font-size: 1.125rem;
+        }
+        
+        .feature-card p {
+            margin: 0;
+            font-size: 0.9rem;
+        }
+        
+        /* 响应式 */
+        @media (max-width: 1024px) {
+            .sidebar {
+                transform: translateX(-100%);
+                transition: transform 0.3s;
+            }
+            
+            .sidebar.open {
+                transform: translateX(0);
+            }
+            
+            .main-content {
+                margin-left: 0;
+            }
+        }
+        
+        /* 滚动条 */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        
+        ::-webkit-scrollbar-track {
+            background: var(--dark-bg);
+        }
+        
+        ::-webkit-scrollbar-thumb {
+            background: var(--border-color);
+            border-radius: 4px;
+        }
+        
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--primary-color);
+        }
+        
+        /* 锚点偏移 */
+        .section[id] {
+            scroll-margin-top: 90px;
+        }
+    </style>
+</head>
+<body>
+    <!-- 导航栏 -->
+    <nav class="navbar">
+        <div class="navbar-content">
+            <div class="logo">🐕 Quadruped Robot</div>
+            <div class="nav-links">
+                <a href="#overview">项目概述</a>
+                <a href="#hardware">硬件设计</a>
+                <a href="#software">软件开发</a>
+                <a href="#algorithm">运动算法</a>
+                <a href="#integration">集成调试</a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- 侧边栏 -->
+    <aside class="sidebar">
+        <div class="sidebar-title">目录导航</div>
+        <ul class="sidebar-menu">
+            <li><a href="#overview" class="active">一、项目概述</a></li>
+            <li><a href="#architecture">1.1 系统架构</a></li>
+            <li><a href="#features">1.2 核心特性</a></li>
+            <li><a href="#hardware">二、硬件架构设计</a></li>
+            <li><a href="#hierarchy">2.1 分层设计</a></li>
+            <li><a href="#comparison">2.2 架构对比</a></li>
+            <li><a href="#components">三、硬件选型与连接</a></li>
+            <li><a href="#bom">3.1 物料清单</a></li>
+            <li><a href="#connection">3.2 连接图</a></li>
+            <li><a href="#can">3.3 CAN总线</a></li>
+            <li><a href="#software">四、软件开发环境</a></li>
+            <li><a href="#rk3588-env">4.1 RK3588环境</a></li>
+            <li><a href="#stm32-env">4.2 STM32H7环境</a></li>
+            <li><a href="#firmware">五、STM32H7固件</a></li>
+            <li><a href="#can-protocol">5.2 CAN协议</a></li>
+            <li><a href="#joint-control">5.3 关节控制</a></li>
+            <li><a href="#gait">5.4 步态生成</a></li>
+            <li><a href="#ros2">六、RK3588 ROS2控制</a></li>
+            <li><a href="#algorithm">七、运动学算法</a></li>
+            <li><a href="#integration">八、集成与调试</a></li>
+            <li><a href="#resources">九、参考资源</a></li>
+        </ul>
+    </aside>
+
+    <!-- 主内容 -->
+    <main class="main-content">
+        <!-- Hero区域 -->
+        <div class="hero">
+            <h1>🐕 ATK-DLRK3588 + STM32H7 四足机器狗开发教程</h1>
+            <p>基于正点原子ATK-DLRK3588开发板（上位机大脑）+ STM32H7单片机（实时控制）的四足机器狗完整开发指南<br>目标：打造类似宇树Unitree Go2的高性能四足机器人</p>
+            <div class="hero-badges">
+                <span class="badge">🤖 ROS2 Humble</span>
+                <span class="badge">⚡ 实时控制</span>
+                <span class="badge">🔧 开源硬件</span>
+                <span class="badge">📊 SLAM导航</span>
+            </div>
+        </div>
+
+        <!-- 项目概述 -->
+        <section class="section" id="overview">
+            <h2><span>📋</span> 一、项目概述</h2>
+            
+            <h3 id="architecture">1.1 系统架构</h3>
+            <div class="architecture-diagram">
+┌─────────────────────────────────────────────────────────────────────┐
+│                         系统架构总览                                  │
+├─────────────────────────────────────────────────────────────────────┤
+│  ┌──────────────────────┐         ┌──────────────────────────────┐ │
+│  │    感知层 (Sensors)   │         │      决策层 (RK3588)          │ │
+│  │  ┌────────────────┐  │         │  ┌────────────────────────┐  │ │
+│  │  │  激光雷达       │  │         │  │  Ubuntu 22.04 + ROS2   │  │ │
+│  │  │  (LiDAR)       │──┼────────┼─▶│  ├─ SLAM (Cartographer) │  │ │
+│  │  └────────────────┘  │ 以太网  │  │  ├─ Nav2 导航           │  │ │
+│  │  ┌────────────────┐  │         │  │  ├─ 运动规划            │  │ │
+│  │  │  深度相机       │  │         │  │  ├─ 视觉感知 (YOLO)     │  │ │
+│  │  │  (RealSense)   │──┼────────┼─▶│  ├─ 语音交互            │  │ │
+│  │  └────────────────┘  │  USB3.0 │  │  └─ 用户界面 (RViz2)    │  │ │
+│  │  ┌────────────────┐  │         │  └────────────────────────┘  │ │
+│  │  │  IMU (9轴)     │  │         │           │                  │ │
+│  │  │  (BMI088)      │──┼────────┼───────────┘                  │ │
+│  │  └────────────────┘  │  UART   │                              │ │
+│  └──────────────────────┘         └──────────────┬───────────────┘ │
+│                                                  │ CAN/CAN-FD      │
+│                                                  ▼                 │
+│  ┌──────────────────────────────────────────────────────────────┐ │
+│  │                    执行层 (STM32H7)                           │ │
+│  │  ├─ 12路关节电机控制 (FOC算法)                                │ │
+│  │  ├─ 步态生成与执行                                           │ │
+│  │  ├─ 平衡控制 (PD/PID控制器)                                  │ │
+│  │  └─ 安全监控与故障保护                                        │ │
+│  └──────────────────────────────────────────────────────────────┘ │
+└─────────────────────────────────────────────────────────────────────┘
+            </div>
+
+            <h3 id="features">1.2 核心特性</h3>
+            <div class="feature-grid">
+                <div class="feature-card">
+                    <div class="feature-icon">🧠</div>
+                    <h4>上位机 (RK3588)</h4>
+                    <p>高层决策、SLAM、导航、AI<br>8核CPU + 6TOPS NPU</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">⚡</div>
+                    <h4>下位机 (STM32H7)</h4>
+                    <p>实时运动控制、关节驱动<br>480MHz Cortex-M7</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">🔌</div>
+                    <h4>通信接口</h4>
+                    <p>CAN-FD总线 + 以太网 + UART<br>5Mbps CAN-FD</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">🦿</div>
+                    <h4>关节电机</h4>
+                    <p>无刷伺服电机 + FOC驱动<br>12个自由度</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">👁️</div>
+                    <h4>传感器</h4>
+                    <p>LiDAR + 深度相机 + IMU<br>360°环境感知</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">🎯</div>
+                    <h4>参考对标</h4>
+                    <p>宇树Unitree Go2<br>MIT Cheetah</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- 硬件架构 -->
+        <section class="section" id="hardware">
+            <h2><span>🔧</span> 二、硬件架构设计</h2>
+            
+            <h3 id="hierarchy">2.1 分层设计思想</h3>
+            <div class="flowchart">
+┌─────────────────────────────────────────────────────────────┐
+│  高层控制层 (High-Level Control)                             │
+│  ├─ 路径规划、SLAM建图、目标识别                              │
+│  ├─ 行为决策、任务调度                                       │
+│  └─ 人机交互                                                │
+│                    ↑ 100Hz 控制指令                          │
+│                    ↓ 状态反馈                                │
+├─────────────────────────────────────────────────────────────┤
+│  中层协调层 (Mid-Level Control)                              │
+│  ├─ 步态规划 (Trot/Walk/Bound)                              │
+│  ├─ 足端轨迹生成                                            │
+│  ├─ 身体姿态控制                                            │
+│  └─ 力分配                                                  │
+│                    ↑ 1kHz 关节指令                           │
+│                    ↓ 关节状态                                │
+├─────────────────────────────────────────────────────────────┤
+│  底层执行层 (Low-Level Control)                              │
+│  ├─ 关节位置/速度/力矩控制                                   │
+│  ├─ FOC电机控制                                             │
+│  ├─ 电流环控制                                              │
+│  └─ 安全保护                                                │
+└─────────────────────────────────────────────────────────────┘
+            </div>
+
+            <h3 id="comparison">2.2 为什么选择RK3588 + STM32H7架构</h3>
+            <table>
+                <tr>
+                    <th>对比项</th>
+                    <th>单芯片方案</th>
+                    <th>分层架构</th>
+                </tr>
+                <tr>
+                    <td>计算能力</td>
+                    <td>有限，难以运行ROS2和SLAM</td>
+                    <td>RK3588可完整运行ROS2+AI算法</td>
+                </tr>
+                <tr>
+                    <td>实时性</td>
+                    <td>好</td>
+                    <td>STM32H7专注实时控制，延迟&lt;1ms</td>
+                </tr>
+                <tr>
+                    <td>扩展性</td>
+                    <td>难以添加高级功能</td>
+                    <td>RK3588支持深度学习、语音、视觉</td>
+                </tr>
+                <tr>
+                    <td>开发效率</td>
+                    <td>需要自行实现所有算法</td>
+                    <td>可直接使用ROS2生态</td>
+                </tr>
+                <tr>
+                    <td>参考案例</td>
+                    <td>菠萝狗、Stanford Pupper</td>
+                    <td>宇树Go2、MIT Cheetah</td>
+                </tr>
+            </table>
+        </section>
+
+        <!-- 硬件选型 -->
+        <section class="section" id="components">
+            <h2><span>📦</span> 三、硬件选型与连接</h2>
+            
+            <h3 id="bom">3.1 核心硬件清单</h3>
+            
+            <h4>上位机系统</h4>
+            <table>
+                <tr>
+                    <th>部件</th>
+                    <th>型号/规格</th>
+                    <th>数量</th>
+                    <th>说明</th>
+                </tr>
+                <tr>
+                    <td>开发板</td>
+                    <td>正点原子ATK-DLRK3588</td>
+                    <td>1</td>
+                    <td>核心板+底板</td>
+                </tr>
+                <tr>
+                    <td>存储</td>
+                    <td>128GB NVMe SSD</td>
+                    <td>1</td>
+                    <td>系统+数据存储</td>
+                </tr>
+                <tr>
+                    <td>散热</td>
+                    <td>主动散热风扇</td>
+                    <td>1</td>
+                    <td>RK3588发热较大</td>
+                </tr>
+            </table>
+
+            <h4>下位机系统</h4>
+            <table>
+                <tr>
+                    <th>部件</th>
+                    <th>型号/规格</th>
+                    <th>数量</th>
+                    <th>说明</th>
+                </tr>
+                <tr>
+                    <td>MCU</td>
+                    <td>STM32H743VIT6</td>
+                    <td>1</td>
+                    <td>Cortex-M7 @ 480MHz</td>
+                </tr>
+                <tr>
+                    <td>CAN收发器</td>
+                    <td>TCAN330GD</td>
+                    <td>4</td>
+                    <td>CAN-FD支持</td>
+                </tr>
+                <tr>
+                    <td>电源管理</td>
+                    <td>DC-DC模块</td>
+                    <td>1</td>
+                    <td>24V→5V/3.3V</td>
+                </tr>
+            </table>
+
+            <h4>关节执行器</h4>
+            <table>
+                <tr>
+                    <th>部件</th>
+                    <th>型号/规格</th>
+                    <th>数量</th>
+                    <th>说明</th>
+                </tr>
+                <tr>
+                    <td>关节电机</td>
+                    <td>无刷伺服电机</td>
+                    <td>12</td>
+                    <td>髋×4 + 膝×4 + 踝×4</td>
+                </tr>
+                <tr>
+                    <td>电机驱动</td>
+                    <td>FOC驱动板</td>
+                    <td>12</td>
+                    <td>支持CAN通信</td>
+                </tr>
+                <tr>
+                    <td>减速器</td>
+                    <td>行星减速器 6:1~10:1</td>
+                    <td>12</td>
+                    <td>根据扭矩需求选择</td>
+                </tr>
+            </table>
+
+            <h3 id="connection">3.2 硬件连接图</h3>
+            <div class="architecture-diagram">
+                    ATK-DLRK3588 (上位机)
+                    ┌─────────────────────┐
+    激光雷达 ──────▶│ 千兆网口            │
+    (Ethernet)      │                     │
+                    │ USB 3.0 ◀───────────┼── 深度相机
+    IMU ───────────▶│ UART                │    (USB)
+    (UART)          │                     │
+                    │ GPIO/SPI ◀──────────┼── 其他传感器
+                    │                     │
+                    │ USB-CAN适配器       │
+                    │ (或SPI-CAN控制器)   │
+                    └──────────┬──────────┘
+                               │ CAN-FD总线
+                               ▼
+                    ┌─────────────────────┐
+                    │   STM32H7 (下位机)   │
+                    │  ┌───────────────┐  │
+                    │  │ CAN控制器×4   │  │
+                    │  │ (支持CAN-FD)  │  │
+                    │  └───────┬───────┘  │
+                    │          │          │
+                    │  ┌───────▼───────┐  │
+                    │  │  关节电机×12  │  │
+                    │  │  (CAN总线)    │  │
+                    │  └───────────────┘  │
+                    └─────────────────────┘
+            </div>
+
+            <h3 id="can">3.3 CAN总线拓扑设计</h3>
+            <div class="architecture-diagram">
+                    ┌─────────────────┐
+                    │   STM32H7       │
+                    │  (CAN主控制器)   │
+                    └────────┬────────┘
+                             │ CAN-FD 5Mbps
+                             ▼
+        ┌────────────────────┼────────────────────┐
+        │                    │                    │
+        ▼                    ▼                    ▼
+   ┌─────────┐        ┌─────────┐          ┌─────────┐
+   │ 腿1电机  │        │ 腿2电机  │          │ 腿3电机  │
+   │ 髋/膝/踝 │        │ 髋/膝/踝 │          │ 髋/膝/踝 │
+   │ ID:1-3  │        │ ID:4-6  │          │ ID:7-9  │
+   └─────────┘        └─────────┘          └─────────┘
+                                                  │
+                                                  ▼
+                                           ┌─────────┐
+                                           │ 腿4电机  │
+                                           │ 髋/膝/踝 │
+                                           │ ID:10-12│
+                                           └─────────┘
+
+CAN ID分配：
+- 0x01-0x03: 腿1 (左前) - 髋/膝/踝
+- 0x04-0x06: 腿2 (右前) - 髋/膝/踝
+- 0x07-0x09: 腿3 (左后) - 髋/膝/踝
+- 0x0A-0x0C: 腿4 (右后) - 髋/膝/踝
+- 0x10: STM32H7状态广播
+            </div>
+        </section>
+
+        <!-- 软件开发环境 -->
+        <section class="section" id="software">
+            <h2><span>💻</span> 四、软件开发环境搭建</h2>
+            
+            <h3 id="rk3588-env">4.1 RK3588上位机环境</h3>
+            
+            <h4>系统安装</h4>
+            <div class="info-box tip">
+                <div class="info-box-title">💡 提示</div>
+                <p>使用正点原子提供的镜像或官方Ubuntu 22.04 for RK3588，推荐使用正点原子SDK构建的Ubuntu系统</p>
+            </div>
+
+            <h4>ROS2 Humble安装</h4>
+            <pre><code class="language-bash"># 1. 设置语言环境
+locale  # 检查当前设置
+sudo apt update && sudo apt install -y locales
+sudo locale-gen en_US en_US.UTF-8
+sudo update-locale LC_ALL=en_US.UTF-8 LANG=en_US.UTF-8
+export LANG=en_US.UTF-8
+
+# 2. 添加ROS2软件源
+sudo apt install -y software-properties-common
+sudo add-apt-repository universe
+sudo apt update && sudo apt install -y curl
+sudo curl -sSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key -o /usr/share/keyrings/ros-archive-keyring.gpg
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/ros-archive-keyring.gpg] http://packages.ros.org/ros2/ubuntu $(. /etc/os-release && echo $UBUNTU_CODENAME) main" | sudo tee /etc/apt/sources.list.d/ros2.list > /dev/null
+
+# 3. 安装ROS2 Humble
+sudo apt update
+sudo apt install -y ros-humble-desktop
+sudo apt install -y ros-dev-tools
+
+# 4. 环境配置
+echo "source /opt/ros/humble/setup.bash" >> ~/.bashrc
+source ~/.bashrc
+
+# 5. 安装自动补全
+sudo apt install -y python3-argcomplete
+
+# 6. 初始化rosdep
+sudo rosdep init
+rosdep update</code></pre>
+
+            <h4>机器人功能包安装</h4>
+            <pre><code class="language-bash"># 安装导航相关包
+sudo apt install -y ros-humble-navigation2 ros-humble-nav2-bringup
+
+# 安装SLAM相关包
+sudo apt install -y ros-humble-slam-toolbox ros-humble-cartographer
+
+# 安装传感器驱动
+sudo apt install -y ros-humble-rplidar-ros ros-humble-realsense2-camera
+
+# 安装CAN通信工具
+sudo apt install -y can-utils</code></pre>
+
+            <h4>CAN接口配置</h4>
+            <pre><code class="language-bash"># 加载CAN内核模块
+sudo modprobe can
+sudo modprobe can_raw
+sudo modprobe slcan
+
+# 配置CAN接口
+sudo ip link set can0 type can bitrate 500000
+sudo ip link set up can0
+
+# 查看CAN接口状态
+ip -details link show can0
+
+# 测试CAN通信
+candump can0  # 监听CAN数据
+cansend can0 123#DEADBEEF  # 发送测试数据</code></pre>
+
+            <h3 id="stm32-env">4.2 STM32H7开发环境</h3>
+            <div class="info-box tip">
+                <div class="info-box-title">💡 推荐开发方案</div>
+                <p><strong>方案A：</strong>STM32CubeMX + HAL库 + FreeRTOS - 适合初学者<br>
+                <strong>方案B：</strong>PlatformIO + Arduino框架 - 开发效率高<br>
+                <strong>方案C：</strong>纯寄存器开发 - 性能最优</p>
+            </div>
+            
+            <pre><code class="language-bash"># 安装ARM GCC工具链
+sudo apt install -y gcc-arm-none-eabi gdb-multiarch openocd
+
+# STM32CubeMX和STM32CubeProgrammer从ST官网下载安装</code></pre>
+        </section>
+
+        <!-- STM32H7固件 -->
+        <section class="section" id="firmware">
+            <h2><span>⚙️</span> 五、STM32H7底层控制程序</h2>
+            
+            <h3>5.1 软件架构</h3>
+            <div class="flowchart">
+STM32H7 Firmware Architecture
+│
+├── Core Layer (核心层)
+│   ├── System Clock (480MHz)
+│   ├── NVIC (中断管理)
+│   └── SysTick (1ms时基)
+│
+├── Driver Layer (驱动层)
+│   ├── CAN-FD Driver (FlexCAN)
+│   ├── TIM (PWM生成)
+│   ├── ADC (电流采样)
+│   └── UART (调试)
+│
+├── Middleware (中间件)
+│   ├── FreeRTOS
+│   ├── CMSIS-DSP
+│   └── PID Controller
+│
+└── Application Layer (应用层)
+    ├── Joint Controller
+    ├── Gait Generator
+    ├── Balance Controller
+    └── Safety Monitor
+            </div>
+
+            <h3 id="can-protocol">5.2 CAN通信协议定义</h3>
+            <pre><code class="language-c">// can_protocol.h
+#ifndef CAN_PROTOCOL_H
+#define CAN_PROTOCOL_H
+
+#include &lt;stdint.h&gt;
+
+// CAN ID定义
+#define CAN_ID_LEG1_HIP     0x01
+#define CAN_ID_LEG1_KNEE    0x02
+#define CAN_ID_LEG1_ANKLE   0x03
+#define CAN_ID_LEG2_HIP     0x04
+#define CAN_ID_LEG2_KNEE    0x05
+#define CAN_ID_LEG2_ANKLE   0x06
+#define CAN_ID_LEG3_HIP     0x07
+#define CAN_ID_LEG3_KNEE    0x08
+#define CAN_ID_LEG3_ANKLE   0x09
+#define CAN_ID_LEG4_HIP     0x0A
+#define CAN_ID_LEG4_KNEE    0x0B
+#define CAN_ID_LEG4_ANKLE   0x0C
+#define CAN_ID_STATUS       0x10
+#define CAN_ID_COMMAND      0x20
+
+// 关节控制指令 (8字节)
+typedef struct {
+    uint16_t position;      // 目标位置 (0.01度/LSB)
+    uint16_t velocity;      // 目标速度
+    uint16_t torque;        // 目标力矩
+    uint8_t  kp;            // 位置环增益
+    uint8_t  kd;            // 速度环增益
+} JointCommand_t;
+
+// 关节状态反馈 (8字节)
+typedef struct {
+    uint16_t position;      // 当前位置
+    uint16_t velocity;      // 当前速度
+    uint16_t torque;        // 当前力矩
+    uint8_t  temperature;   // 温度
+    uint8_t  error_code;    // 错误码
+} JointStatus_t;
+
+#endif</code></pre>
+
+            <h3 id="joint-control">5.3 关节控制器</h3>
+            <pre><code class="language-c">// joint_controller.c
+#include "joint_controller.h"
+#include &lt;math.h&gt;
+
+#define NUM_JOINTS 12
+
+static Joint_t joints[NUM_JOINTS];
+
+void JointController_Init(void) {
+    for (int i = 0; i &lt; NUM_JOINTS; i++) {
+        joints[i].id = i + 1;
+        joints[i].position = 0.0f;
+        joints[i].velocity = 0.0f;
+        joints[i].torque = 0.0f;
+        joints[i].target_pos = 0.0f;
+        joints[i].target_vel = 0.0f;
+        joints[i].kp = 10.0f;
+        joints[i].kd = 1.0f;
+        joints[i].enabled = 0;
+    }
+}
+
+void JointController_Update(void) {
+    // 1kHz控制频率
+    for (int i = 0; i &lt; NUM_JOINTS; i++) {
+        if (!joints[i].enabled) continue;
+        
+        // PD控制计算
+        float pos_error = joints[i].target_pos - joints[i].position;
+        float vel_error = joints[i].target_vel - joints[i].velocity;
+        
+        float torque_cmd = joints[i].kp * pos_error + 
+                          joints[i].kd * vel_error + 
+                          joints[i].target_torque;
+        
+        // 力矩限幅
+        if (torque_cmd &gt; 20.0f) torque_cmd = 20.0f;
+        if (torque_cmd &lt; -20.0f) torque_cmd = -20.0f;
+        
+        joints[i].torque = torque_cmd;
+    }
+}</code></pre>
+
+            <h3 id="gait">5.4 步态生成器</h3>
+            <pre><code class="language-c">// gait_generator.c
+
+// Trot步态足端轨迹生成
+void generateTrotGait(double time, double period,
+                      double step_length, double step_height,
+                      std::vector&lt;double&gt;&amp; foot_heights) {
+    // Trot步态：对角腿同步
+    double phase0 = fmod(time / period, 1.0);
+    double phase1 = fmod(phase0 + 0.5, 1.0);
+    
+    foot_heights.resize(4);
+    foot_heights[0] = cycloidZ(phase0, step_height);
+    foot_heights[1] = cycloidZ(phase1, step_height);
+    foot_heights[2] = cycloidZ(phase1, step_height);
+    foot_heights[3] = cycloidZ(phase0, step_height);
+}
+
+// 摆线轨迹
+double cycloidZ(double phase, double height) {
+    if (phase &lt; 0.5) {
+        // 摆动相
+        double theta = phase * 4.0 * M_PI;
+        return height * (1.0 - cos(theta)) / 2.0;
+    }
+    return 0.0;  // 支撑相
+}</code></pre>
+        </section>
+
+        <!-- ROS2控制 -->
+        <section class="section" id="ros2">
+            <h2><span>🤖</span> 六、RK3588 ROS2上层控制</h2>
+            
+            <h3>6.1 ROS2功能包架构</h3>
+            <div class="flowchart">
+quadruped_ros2_ws/
+├── quadruped_description/       # 机器人描述
+│   ├── urdf/quadruped.urdf.xacro
+│   └── launch/display.launch.py
+├── quadruped_control/           # 运动控制
+│   ├── gait_controller.cpp
+│   └── balance_controller.cpp
+├── quadruped_hardware/          # 硬件接口
+│   ├── can_interface.cpp
+│   └── joint_driver.cpp
+├── quadruped_navigation/        # 导航
+│   ├── nav2_params.yaml
+│   └── slam.launch.py
+└── quadruped_bringup/           # 启动集成
+    └── quadruped.launch.py
+            </div>
+
+            <h3>6.2 硬件接口节点 (CAN通信)</h3>
+            <pre><code class="language-cpp">// can_interface.cpp
+#include &lt;rclcpp/rclcpp.hpp&gt;
+#include &lt;sensor_msgs/msg/joint_state.hpp&gt;
+#include &lt;linux/can.h&gt;
+#include &lt;sys/socket.h&gt;
+
+namespace quadruped_hardware {
+
+class CANInterface : public rclcpp::Node {
+public:
+    CANInterface() : Node("can_interface") {
+        this-&gt;declare_parameter("can_interface", "can0");
+        
+        initCAN();
+        
+        joint_state_pub_ = this-&gt;create_publisher&lt;sensor_msgs::msg::JointState&gt;(
+            "joint_states", 10);
+        
+        timer_ = this-&gt;create_wall_timer(
+            std::chrono::milliseconds(10),
+            std::bind(&amp;CANInterface::controlLoop, this));
+    }
+
+private:
+    void initCAN() {
+        socket_ = socket(PF_CAN, SOCK_RAW, CAN_RAW);
+        // ... CAN初始化代码
+    }
+    
+    void controlLoop() {
+        struct can_frame frame;
+        sensor_msgs::msg::JointState joint_state;
+        
+        // 读取CAN数据
+        while (read(socket_, &amp;frame, sizeof(frame)) &gt; 0) {
+            if (frame.can_id &gt;= 1 &amp;&amp; frame.can_id &lt;= 12) {
+                size_t idx = frame.can_id - 1;
+                int16_t pos = frame.data[0] | (frame.data[1] &lt;&lt; 8);
+                joint_state.position[idx] = pos / 100.0 * M_PI / 180.0;
+            }
+        }
+        
+        joint_state_pub_-&gt;publish(joint_state);
+    }
+    
+    int socket_;
+    rclcpp::Publisher&lt;sensor_msgs::msg::JointState&gt;::SharedPtr joint_state_pub_;
+};
+
+}  // namespace quadruped_hardware</code></pre>
+
+            <h3>6.3 启动文件</h3>
+            <pre><code class="language-python"># quadruped.launch.py
+from launch import LaunchDescription
+from launch_ros.actions import Node
+
+def generate_launch_description():
+    return LaunchDescription([
+        # 硬件接口节点
+        Node(
+            package='quadruped_hardware',
+            executable='can_interface',
+            name='can_interface',
+            parameters=[{
+                'can_interface': 'can0',
+                'control_frequency': 100.0
+            }]
+        ),
+        
+        # 运动控制节点
+        Node(
+            package='quadruped_control',
+            executable='gait_controller',
+            name='gait_controller',
+            parameters=[{
+                'gait_frequency': 2.0,
+                'step_height': 0.05,
+                'body_height': 0.3
+            }]
+        ),
+        
+        # RViz2可视化
+        Node(
+            package='rviz2',
+            executable='rviz2',
+            name='rviz2'
+        ),
+    ])</code></pre>
+        </section>
+
+        <!-- 运动学算法 -->
+        <section class="section" id="algorithm">
+            <h2><span>📐</span> 七、四足运动学算法</h2>
+            
+            <h3>7.1 腿部运动学模型</h3>
+            <div class="architecture-diagram">
+                    身体坐标系 {B}
+                         │
+                         │ L0 (髋部偏移)
+                         ▼
+    髋关节 {H} ────────●──────── 髋关节旋转 (θ1, 绕X轴)
+                         │
+                         │ L1 (大腿长度)
+                         │
+                         ▼
+    膝关节 {K} ─────────●─────── 膝关节旋转 (θ2, 绕Y轴)
+                         │
+                         │ L2 (小腿长度)
+                         │
+                         ▼
+    踝关节 {A} ─────────●─────── 踝关节旋转 (θ3, 绕Y轴)
+                         │
+                         │ L3 (足部长度)
+                         ▼
+    足端 {F}             ●
+            </div>
+
+            <h3>7.2 逆运动学</h3>
+            <pre><code class="language-cpp">// 逆运动学：足端位置 → 关节角度
+bool inverseKinematics(double x, double y, double z,
+                       double L0, double L1, double L2, double L3,
+                       double&amp; theta1, double&amp; theta2, double&amp; theta3) {
+    // 髋关节角度
+    theta1 = atan2(y - L0, z);
+    
+    // 转换到腿部平面坐标系
+    double d = sqrt(x*x + (y-L0)*(y-L0) + z*z);
+    double z_leg = sqrt((y-L0)*(y-L0) + z*z);
+    
+    // 检查可达性
+    double max_reach = L1 + L2 + L3;
+    double min_reach = fabs(L1 - L2 - L3);
+    if (d &gt; max_reach || d &lt; min_reach) {
+        return false;  // 不可达
+    }
+    
+    // 膝关节角度 (余弦定理)
+    double cos_knee = (L1*L1 + L2*L2 - d*d) / (2*L1*L2);
+    theta2 = M_PI - acos(cos_knee);
+    
+    // 踝关节角度
+    double alpha = atan2(x, z_leg);
+    double beta = acos((L1*L1 + d*d - L2*L2) / (2*L1*d));
+    theta3 = alpha + beta;
+    
+    return true;
+}</code></pre>
+        </section>
+
+        <!-- 集成调试 -->
+        <section class="section" id="integration">
+            <h2><span>🔨</span> 八、整机集成与调试</h2>
+            
+            <h3>8.1 系统启动流程</h3>
+            <div class="flowchart">
+1. 上电初始化
+   ├── STM32H7启动
+   │   ├── 初始化外设
+   │   ├── 初始化关节电机
+   │   ├── 进入待机状态
+   │   └── 等待RK3588指令
+   │
+   └── RK3588启动
+       ├── 加载Ubuntu系统
+       ├── 启动ROS2
+       ├── 加载CAN驱动
+       ├── 启动硬件接口节点
+       └── 进入待机状态
+
+2. 系统自检
+   ├── 检查CAN通信
+   ├── 检查关节电机状态
+   ├── 检查传感器
+   └── 报告系统状态
+
+3. 运动准备
+   ├── 切换到站立姿态
+   ├── 使能关节电机
+   └── 等待运动指令
+            </div>
+
+            <h3>8.2 调试工具</h3>
+            <pre><code class="language-bash"># 1. CAN总线监控
+candump can0          # 监听所有CAN数据
+cansend can0 001#FF.FF.FF.FF.FF.FF.FF.FF  # 发送测试指令
+
+# 2. ROS2话题监控
+ros2 topic list                    # 列出所有话题
+ros2 topic echo /joint_states      # 查看关节状态
+ros2 topic pub /cmd_vel geometry_msgs/msg/Twist '{linear: {x: 0.1}}'
+
+# 3. RViz2可视化
+ros2 launch quadruped_bringup quadruped.launch.py
+
+# 4. 参数动态调整
+ros2 param set /gait_controller gait_frequency 3.0</code></pre>
+
+            <h3>8.3 常见问题排查</h3>
+            <table>
+                <tr>
+                    <th>问题</th>
+                    <th>可能原因</th>
+                    <th>解决方案</th>
+                </tr>
+                <tr>
+                    <td>CAN通信失败</td>
+                    <td>接线错误/终端电阻</td>
+                    <td>检查CAN_H/CAN_L接线，添加120Ω终端电阻</td>
+                </tr>
+                <tr>
+                    <td>电机不响应</td>
+                    <td>ID冲突/电源不足</td>
+                    <td>检查电机ID设置，测量电源电压</td>
+                </tr>
+                <tr>
+                    <td>步态不稳定</td>
+                    <td>PID参数不当</td>
+                    <td>调整kp/kd参数，降低步态频率</td>
+                </tr>
+                <tr>
+                    <td>上位机无法启动</td>
+                    <td>系统损坏</td>
+                    <td>重新烧录系统镜像</td>
+                </tr>
+            </table>
+
+            <div class="info-box danger">
+                <div class="info-box-title">⚠️ 安全注意事项</div>
+                <p><strong>机械安全：</strong>确保机械结构牢固，添加急停按钮，设置关节限位<br>
+                <strong>电气安全：</strong>使用合适的电源，添加过流保护，注意高压隔离<br>
+                <strong>软件安全：</strong>添加看门狗，实现故障检测，设置最大速度/力矩限制</p>
+            </div>
+        </section>
+
+        <!-- 参考资源 -->
+        <section class="section" id="resources">
+            <h2><span>📚</span> 九、参考资源</h2>
+            
+            <h3>开源项目</h3>
+            <table>
+                <tr>
+                    <th>项目</th>
+                    <th>链接</th>
+                    <th>说明</th>
+                </tr>
+                <tr>
+                    <td>MIT Cheetah</td>
+                    <td>github.com/mit-biomimetics</td>
+                    <td>MIT官方开源</td>
+                </tr>
+                <tr>
+                    <td>菠萝狗</td>
+                    <td>github.com/ToanTech</td>
+                    <td>国产开源四足</td>
+                </tr>
+                <tr>
+                    <td>Stanford Pupper</td>
+                    <td>github.com/stanfordroboticsclub</td>
+                    <td>斯坦福开源</td>
+                </tr>
+                <tr>
+                    <td>Unitree Go2 SDK</td>
+                    <td>github.com/unitreerobotics</td>
+                    <td>宇树ROS2 SDK</td>
+                </tr>
+            </table>
+
+            <h3>预估成本</h3>
+            <table>
+                <tr>
+                    <th>版本</th>
+                    <th>功能</th>
+                    <th>预估价格</th>
+                </tr>
+                <tr>
+                    <td>基础版</td>
+                    <td>仅运动功能</td>
+                    <td>¥8,000 - 12,000</td>
+                </tr>
+                <tr>
+                    <td>标准版</td>
+                    <td>+ SLAM导航</td>
+                    <td>¥12,000 - 18,000</td>
+                </tr>
+                <tr>
+                    <td>完整版</td>
+                    <td>+ AI视觉</td>
+                    <td>¥18,000 - 25,000</td>
+                </tr>
+            </table>
+
+            <div class="info-box warning">
+                <div class="info-box-title">📢 免责声明</div>
+                <p>本教程仅供学习参考，实际制作涉及机械加工、电气安全和控制算法等专业领域，请确保具备相应知识和能力。制作过程中请注意人身和设备安全。</p>
+            </div>
+
+            <div style="text-align: center; margin-top: 3rem; padding: 2rem; border-top: 1px solid var(--border-color);">
+                <p style="color: var(--text-secondary);">
+                    教程版本: v1.0 | 更新日期: 2026-03-24
+                </p>
+            </div>
+        </section>
+    </main>
+
+    <script>
+        // 侧边栏导航高亮
+        const sections = document.querySelectorAll('.section[id]');
+        const navLinks = document.querySelectorAll('.sidebar-menu a');
+
+        window.addEventListener('scroll', () => {
+            let current = '';
+            sections.forEach(section => {
+                const sectionTop = section.offsetTop;
+                const sectionHeight = section.clientHeight;
+                if (scrollY >= sectionTop - 100) {
+                    current = section.getAttribute('id');
+                }
+            });
+
+            navLinks.forEach(link => {
+                link.classList.remove('active');
+                if (link.getAttribute('href') === '#' + current) {
+                    link.classList.add('active');
+                }
+            });
+        });
+
+        // 平滑滚动
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                const target = document.querySelector(this.getAttribute('href'));
+                if (target) {
+                    target.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'start'
+                    });
+                }
+            });
+        });
+    </script>
+</body>
+</html>

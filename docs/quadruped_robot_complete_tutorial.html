@@ -1,0 +1,1648 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ATK-DLRK3588 + STM32H7 四足机器狗超详细开发教程</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --primary: #2563eb; --secondary: #1e40af; --accent: #3b82f6;
+            --success: #10b981; --warning: #f59e0b; --danger: #ef4444;
+            --dark: #0f172a; --card: #1e293b; --text: #f1f5f9; --text2: #94a3b8;
+            --border: #334155; --code: #0d1117;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            color: var(--text); line-height: 1.8;
+        }
+        .navbar {
+            position: fixed; top: 0; left: 0; right: 0;
+            background: rgba(15, 23, 42, 0.98); backdrop-filter: blur(10px);
+            border-bottom: 1px solid var(--border); z-index: 1000;
+            padding: 1rem 2rem;
+        }
+        .navbar-content { max-width: 1600px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; }
+        .logo { font-size: 1.5rem; font-weight: bold; background: linear-gradient(135deg, var(--accent), var(--success)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .sidebar { position: fixed; left: 0; top: 70px; bottom: 0; width: 320px; background: var(--card); border-right: 1px solid var(--border); overflow-y: auto; padding: 1rem; }
+        .sidebar-title { font-size: 0.8rem; font-weight: 600; color: var(--text2); text-transform: uppercase; margin: 1rem 0 0.5rem; }
+        .sidebar-menu { list-style: none; }
+        .sidebar-menu li { margin-bottom: 0.25rem; }
+        .sidebar-menu a { display: block; padding: 0.4rem 0.6rem; color: var(--text2); text-decoration: none; border-radius: 0.375rem; font-size: 0.85rem; transition: all 0.2s; }
+        .sidebar-menu a:hover { background: rgba(59, 130, 246, 0.1); color: var(--accent); }
+        .sidebar-menu a.active { background: var(--primary); color: white; }
+        .main-content { margin-left: 320px; margin-top: 70px; padding: 2rem; max-width: 1200px; }
+        .hero { background: linear-gradient(135deg, rgba(37, 99, 235, 0.1) 0%, rgba(16, 185, 129, 0.1) 100%); border: 1px solid var(--border); border-radius: 1rem; padding: 3rem; margin-bottom: 2rem; text-align: center; }
+        .hero h1 { font-size: 2.2rem; margin-bottom: 1rem; background: linear-gradient(135deg, var(--text), var(--accent)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .section { background: var(--card); border: 1px solid var(--border); border-radius: 1rem; padding: 2rem; margin-bottom: 1.5rem; }
+        .section h2 { font-size: 1.6rem; margin-bottom: 1rem; padding-bottom: 0.5rem; border-bottom: 2px solid var(--primary); }
+        .section h3 { font-size: 1.3rem; margin: 1.5rem 0 0.75rem; color: var(--accent); }
+        .section h4 { font-size: 1.1rem; margin: 1.2rem 0 0.5rem; color: var(--text); }
+        pre { background: var(--code); border: 1px solid var(--border); border-radius: 0.5rem; padding: 1rem; overflow-x: auto; margin: 1rem 0; font-size: 0.85rem; }
+        code { font-family: 'Consolas', 'Monaco', monospace; }
+        table { width: 100%; border-collapse: collapse; margin: 1rem 0; background: var(--code); border-radius: 0.5rem; overflow: hidden; font-size: 0.9rem; }
+        th { background: var(--primary); color: white; padding: 0.75rem; text-align: left; }
+        td { padding: 0.6rem 0.75rem; border-bottom: 1px solid var(--border); color: var(--text2); }
+        tr:hover td { background: rgba(59, 130, 246, 0.05); }
+        .info-box { padding: 1rem; border-radius: 0.5rem; margin: 1rem 0; border-left: 4px solid; }
+        .info-box.tip { background: rgba(16, 185, 129, 0.1); border-color: var(--success); }
+        .info-box.warning { background: rgba(245, 158, 11, 0.1); border-color: var(--warning); }
+        .info-box.danger { background: rgba(239, 68, 68, 0.1); border-color: var(--danger); }
+        .step { background: var(--code); border: 1px solid var(--border); border-radius: 0.5rem; padding: 1rem; margin: 0.75rem 0; }
+        .step-title { font-weight: 600; color: var(--accent); margin-bottom: 0.5rem; }
+        .error-box { background: rgba(239, 68, 68, 0.1); border: 1px solid var(--danger); border-radius: 0.5rem; padding: 0.75rem; margin: 0.5rem 0; }
+        .error-title { color: var(--danger); font-weight: 600; }
+        .solution { background: rgba(16, 185, 129, 0.1); border: 1px solid var(--success); border-radius: 0.5rem; padding: 0.75rem; margin: 0.5rem 0; }
+        .param-table td:first-child { font-family: monospace; color: var(--accent); }
+        .cubemx-step { display: flex; gap: 1rem; margin: 0.75rem 0; padding: 0.75rem; background: var(--code); border-radius: 0.5rem; }
+        .cubemx-num { width: 28px; height: 28px; background: var(--primary); color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; flex-shrink: 0; }
+        .highlight { background: rgba(59, 130, 246, 0.2); padding: 0.1rem 0.3rem; border-radius: 0.25rem; }
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: var(--dark); }
+        ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+        .section[id] { scroll-margin-top: 80px; }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="navbar-content">
+            <div class="logo">🐕 ATK-DLRK3588 四足机器狗超详细教程</div>
+        </div>
+    </nav>
+
+    <aside class="sidebar">
+        <div class="sidebar-title">目录导航</div>
+        <ul class="sidebar-menu">
+            <li><a href="#part1">第一部分：机械结构设计</a></li>
+            <li><a href="#part2">第二部分：电机驱动选型</a></li>
+            <li><a href="#part3">第三部分：STM32CubeMX配置</a></li>
+            <li><a href="#part4">第四部分：底层代码详解</a></li>
+            <li><a href="#part5">第五部分：ROS2导航配置</a></li>
+            <li><a href="#part6">第六部分：故障排查手册</a></li>
+        </ul>
+    </aside>
+
+    <main class="main-content">
+        <div class="hero">
+            <h1>ATK-DLRK3588 + STM32H7 四足机器狗</h1>
+            <p>超详细开发教程 - 从机械设计到代码实现的完整指南</p>
+        </div>
+
+        <!-- 第一部分：机械结构设计 -->
+        <section class="section" id="part1">
+            <h2>第一部分：机械结构设计</h2>
+            
+            <h3>1.1 整体结构设计</h3>
+            <p>四足机器狗的机械结构参考MIT Cheetah和宇树Go2的设计，采用模块化关节设计。</p>
+            
+            <h4>1.1.1 关键尺寸参数</h4>
+            <table>
+                <tr><th>参数</th><th>数值</th><th>说明</th></tr>
+                <tr><td>身体长度</td><td>400mm</td><td>前后髋关节中心距</td></tr>
+                <tr><td>身体宽度</td><td>200mm</td><td>左右髋关节中心距</td></tr>
+                <tr><td>身体高度</td><td>80mm</td><td>底盘到顶板距离</td></tr>
+                <tr><td>大腿长度(L1)</td><td>200mm</td><td>髋关节到膝关节</td></tr>
+                <tr><td>小腿长度(L2)</td><td>200mm</td><td>膝关节到踝关节</td></tr>
+                <tr><td>总重量</td><td>&lt;10kg</td><td>含电池和电子设备</td></tr>
+            </table>
+
+            <h4>1.1.2 材料选择</h4>
+            <table>
+                <tr><th>部件</th><th>材料</th><th>厚度/规格</th><th>原因</th></tr>
+                <tr><td>主框架</td><td>6061-T6铝合金</td><td>3mm板材</td><td>强度高、重量轻、易加工</td></tr>
+                <tr><td>腿部连杆</td><td>7075铝合金</td><td>10mm方管</td><td>高比强度</td></tr>
+                <tr><td>关节外壳</td><td>PA66+GF30尼龙</td><td>3D打印</td><td>自润滑、耐磨</td></tr>
+                <tr><td>轴承</td><td>6900ZZ</td><td>10×22×6mm</td><td>深沟球轴承</td></tr>
+            </table>
+
+            <h3>1.2 腿部结构设计</h3>
+            
+            <h4>1.2.1 三自由度腿部结构</h4>
+            <pre>
+                    身体 (Body)
+                      │
+                      │ 髋部偏移 (40mm)
+                      ▼
+    ┌─────────────────┼─────────────────┐
+    │                 │                 │
+    ▼                 ▼                 ▼
+ 侧摆关节          俯仰关节          侧摆关节
+ (Hip Roll)      (Hip Pitch)      (Hip Roll)
+    │                 │                 │
+    │ L0=40mm        │ L0=40mm         │ L0=40mm
+    │                │                 │
+    ▼                ▼                 ▼
+  大腿连杆        大腿连杆          大腿连杆
+  (L1=200mm)     (L1=200mm)        (L1=200mm)
+    │                │                 │
+    ▼                ▼                 ▼
+  膝关节         膝关节            膝关节
+ (Knee Pitch)   (Knee Pitch)      (Knee Pitch)
+    │                │                 │
+    │ L2=200mm      │ L2=200mm        │ L2=200mm
+    │                │                 │
+    ▼                ▼                 ▼
+  小腿连杆       小腿连杆          小腿连杆
+    │                │                 │
+    ▼                ▼                 ▼
+  足端           足端              足端
+ (橡胶垫)       (橡胶垫)          (橡胶垫)
+            </pre>
+
+            <h4>1.2.2 关节布局设计</h4>
+            <p>采用<b>前肘后膝</b>布局，前腿膝关节向前，后腿膝关节向后，这种设计：</p>
+            <ul>
+                <li>提高运动稳定性</li>
+                <li>避免腿部干涉</li>
+                <li>参考猫科动物的腿部结构</li>
+            </ul>
+
+            <h3>1.3 零件清单 (BOM)</h3>
+            
+            <h4>1.3.1 机械零件清单</h4>
+            <table>
+                <tr><th>序号</th><th>名称</th><th>材料</th><th>数量</th><th>加工方式</th></tr>
+                <tr><td>1</td><td>主框架底板</td><td>6061铝合金</td><td>1</td><td>CNC加工</td></tr>
+                <tr><td>2</td><td>主框架顶板</td><td>6061铝合金</td><td>1</td><td>CNC加工</td></tr>
+                <tr><td>3</td><td>侧板</td><td>6061铝合金</td><td>4</td><td>CNC加工</td></tr>
+                <tr><td>4</td><td>髋关节支架</td><td>7075铝合金</td><td>8</td><td>CNC加工</td></tr>
+                <tr><td>5</td><td>大腿连杆</td><td>7075铝合金</td><td>4</td><td>CNC加工</td></tr>
+                <tr><td>6</td><td>小腿连杆</td><td>7075铝合金</td><td>4</td><td>CNC加工</td></tr>
+                <tr><td>7</td><td>膝关节支架</td><td>PA66尼龙</td><td>4</td><td>3D打印</td></tr>
+                <tr><td>8</td><td>足端橡胶垫</td><td>橡胶</td><td>4</td><td>标准件</td></tr>
+            </table>
+
+            <h4>1.3.2 标准件清单</h4>
+            <table>
+                <tr><th>名称</th><th>规格</th><th>数量</th><th>用途</th></tr>
+                <tr><td>轴承</td><td>6900ZZ</td><td>24</td><td>关节旋转</td></tr>
+                <tr><td>轴承</td><td>6800ZZ</td><td>12</td><td>电机输出</td></tr>
+                <tr><td>内六角螺丝</td><td>M4×16</td><td>50</td><td>结构连接</td></tr>
+                <tr><td>内六角螺丝</td><td>M4×25</td><td>30</td><td>关节固定</td></tr>
+                <tr><td>内六角螺丝</td><td>M3×10</td><td>40</td><td>电机固定</td></tr>
+                <tr><td>法兰螺母</td><td>M4</td><td>80</td><td>防松</td></tr>
+            </table>
+
+            <h3>1.4 3D建模步骤 (SolidWorks)</h3>
+            
+            <div class="step">
+                <div class="step-title">步骤1：创建腿部装配体</div>
+                <pre><code>; 新建装配体文件
+文件 → 新建 → 装配体
+
+; 插入第一个零件 - 髋关节支架
+插入 → 零部件 → 现有零件/装配体
+选择: Hip_Bracket.sldprt
+
+; 固定第一个零件
+右键点击零件 → 浮动/固定 → 固定
+
+; 插入大腿连杆
+插入 → 零部件 → 现有零件/装配体
+选择: Thigh_Link.sldprt
+
+; 添加配合关系
+配合 → 同心: 选择轴承孔和连杆孔
+配合 → 重合: 选择侧面</code></pre>
+            </div>
+
+            <div class="error-box">
+                <div class="error-title">❌ 常见错误：配合过定义</div>
+                <p>错误信息："配合导致过定义，无法求解"</p>
+            </div>
+            <div class="solution">
+                <div class="error-title" style="color: var(--success);">✅ 解决方案</div>
+                <p>1. 检查是否有重复的配合关系<br>
+                2. 删除多余的"重合"配合<br>
+                3. 使用"机械配合"中的"铰链"代替手动配合</p>
+            </div>
+
+            <h3>1.5 运动学验证</h3>
+            <p>使用SolidWorks Motion进行运动学仿真：</p>
+            <pre><code>; 启动Motion分析
+工具 → 插件 → 勾选 SolidWorks Motion
+
+; 添加马达
+Motion Study → 马达 → 选择旋转轴
+类型: 数据点
+数据点:
+  时间: 0s, 角度: 0°
+  时间: 1s, 角度: 30°
+  时间: 2s, 角度: 0°
+
+; 运行仿真
+计算 → 播放</code></pre>
+        </section>
+
+        <!-- 第二部分：电机驱动选型 -->
+        <section class="section" id="part2">
+            <h2>第二部分：电机驱动选型</h2>
+            
+            <h3>2.1 关节电机选型</h3>
+            
+            <h4>2.1.1 电机参数计算</h4>
+            <p>根据机器狗重量和运动要求计算所需电机参数：</p>
+            
+            <table>
+                <tr><th>参数</th><th>计算公式</th><th>数值</th></tr>
+                <tr><td>机器狗总重</td><td>m = 10kg</td><td>10 kg</td></tr>
+                <tr><td>单腿最大负载</td><td>F = m×g/2 = 10×9.8/2</td><td>49 N</td></tr>
+                <tr><td>膝关节力矩</td><td>T = F×L2 = 49×0.2</td><td>9.8 N·m</td></tr>
+                <tr><td>安全系数</td><td>取2.0</td><td>2.0</td></tr>
+                <tr><td>电机额定扭矩</td><td>T_motor = T×2</td><td>&gt;20 N·m</td></tr>
+            </table>
+
+            <h4>2.1.2 推荐电机型号对比</h4>
+            <table>
+                <tr><th>型号</th><th>品牌</th><th>额定扭矩</th><th>峰值扭矩</th><th>转速</th><th>价格</th><th>推荐度</th></tr>
+                <tr><td>MJ5208</td><td>小米</td><td>2.5 N·m</td><td>8 N·m</td><td>200 RPM</td><td>¥280</td><td>⭐⭐⭐</td></tr>
+                <tr><td>GM3510</td><td>达妙</td><td>3.0 N·m</td><td>10 N·m</td><td>180 RPM</td><td>¥350</td><td>⭐⭐⭐⭐</td></tr>
+                <tr><td>AK60-6</td><td>T-Motor</td><td>3.5 N·m</td><td>12 N·m</td><td>150 RPM</td><td>¥450</td><td>⭐⭐⭐⭐⭐</td></tr>
+                <tr><td>MIT电机</td><td>定制</td><td>6.9 N·m</td><td>17 N·m</td><td>382 RPM</td><td>¥800+</td><td>⭐⭐⭐⭐⭐</td></tr>
+            </table>
+
+            <div class="info-box tip">
+                <b>💡 选型建议</b><br>
+                初学者推荐<b>达妙GM3510</b>，性价比高，社区支持好。<br>
+                追求性能选择<b>T-Motor AK60-6</b>或<b>小米MJ5208</b>。
+            </div>
+
+            <h3>2.2 电机驱动器设计</h3>
+            
+            <h4>2.2.1 驱动器方案选择</h4>
+            <table>
+                <tr><th>方案</th><th>主控</th><th>驱动芯片</th><th>电流能力</th><th>复杂度</th></tr>
+                <tr><td>方案A</td><td>STM32F103</td><td>DRV8313</td><td>2.5A</td><td>低</td></tr>
+                <tr><td>方案B</td><td>STM32G431</td><td>DRV8323</td><td>8A</td><td>中</td></tr>
+                <tr><td>方案C</td><td>STM32H7</td><td>分立MOS</td><td>20A+</td><td>高</td></tr>
+            </table>
+
+            <h4>2.2.2 推荐电路设计 (基于DRV8313)</h4>
+            <pre><code>; 主控: STM32F103C8T6
+; 驱动: DRV8313 (3相半桥驱动)
+; 编码器: MT6701 (磁编码器SPI接口)
+; 电流采样: INA199A1
+
+电路连接:
+┌─────────────────────────────────────────┐
+│           STM32F103C8T6                 │
+│                                         │
+│  PA8 ───────► INHA (DRV8313 U相上桥)    │
+│  PA9 ───────► INHB (DRV8313 V相上桥)    │
+│  PA10 ──────► INHC (DRV8313 W相上桥)    │
+│  PB13 ──────► INLA (DRV8313 U相下桥)    │
+│  PB14 ──────► INLB (DRV8313 V相下桥)    │
+│  PB15 ──────► INLC (DRV8313 W相下桥)    │
+│                                         │
+│  PA4 ───────► CS (MT6701 SPI片选)       │
+│  PA5 ───────► SCK (MT6701 SPI时钟)      │
+│  PA6 ───────► MISO (MT6701 SPI数据出)   │
+│  PA7 ───────► MOSI (MT6701 SPI数据入)   │
+│                                         │
+│  PA0 ───────► IOUT (INA199 电流采样)    │
+│                                         │
+└─────────────────────────────────────────┘</code></pre>
+
+            <h4>2.2.3 电流采样电路计算</h4>
+            <pre><code>; 采样电阻: R_sense = 0.01Ω (10mΩ)
+; 放大倍数: G = 50 (INA199A1)
+; 基准电压: V_ref = 1.65V (半量程偏置)
+
+; 电流计算公式:
+I = (V_ref - V_ADC) / (G × R_sense)
+
+; 示例:
+; ADC读数: 1.65V → 电流 = 0A
+; ADC读数: 1.15V → 电流 = (1.65-1.15)/(50×0.01) = 1A
+; ADC读数: 2.15V → 电流 = (1.65-2.15)/(50×0.01) = -1A
+
+; 最大测量电流:
+I_max = 1.65V / (50 × 0.01Ω) = 3.3A (单向)
+; 实际双向范围: -3.3A ~ +3.3A</code></pre>
+
+            <h3>2.3 减速器选型</h3>
+            <table>
+                <tr><th>类型</th><th>减速比</th><th>效率</th><th> backlash</th><th>适用位置</th></tr>
+                <tr><td>行星减速器</td><td>6:1 ~ 10:1</td><td>95%</td><td>&lt;1°</td><td>髋关节、膝关节</td></tr>
+                <tr><td>谐波减速器</td><td>50:1 ~ 100:1</td><td>80%</td><td>&lt;0.1°</td><td>精密关节(可选)</td></tr>
+                <tr><td>同步带</td><td>1:1 ~ 3:1</td><td>98%</td><td>无</td><td>踝关节传动</td></tr>
+            </table>
+        </section>
+
+        <!-- 第三部分：STM32CubeMX配置 -->
+        <section class="section" id="part3">
+            <h2>第三部分：STM32CubeMX配置详解</h2>
+            
+            <h3>3.1 新建工程</h3>
+            
+            <div class="cubemx-step">
+                <div class="cubemx-num">1</div>
+                <div>
+                    <b>打开STM32CubeMX</b><br>
+                    File → New Project → 选择芯片型号
+                </div>
+            </div>
+            <pre><code>芯片型号: STM32H743VIT6
+封装: LQFP100
+Flash: 2MB
+RAM: 1MB
+主频: 480MHz</code></pre>
+
+            <div class="error-box">
+                <div class="error-title">❌ 错误：芯片型号选择错误</div>
+                <p>如果选择了STM32H743ZI，引脚数量不匹配(144 vs 100)</p>
+            </div>
+            <div class="solution">
+                <div class="error-title" style="color: var(--success);">✅ 解决方案</div>
+                <p>确认开发板上的芯片丝印，选择正确的封装型号</p>
+            </div>
+
+            <h3>3.2 时钟配置</h3>
+            
+            <div class="cubemx-step">
+                <div class="cubemx-num">2</div>
+                <div>
+                    <b>配置时钟树</b><br>
+                    点击Clock Configuration选项卡
+                </div>
+            </div>
+            <pre><code>; 输入时钟: HSE = 25MHz (外部晶振)
+; 目标系统时钟: 480MHz
+
+PLL1配置:
+  - 输入分频: DIVM1 = 5 (25MHz/5 = 5MHz)
+  - VCO倍频: DIVN1 = 192 (5MHz×192 = 960MHz)
+  - PLL输出分频: DIVP1 = 2 (960MHz/2 = 480MHz)
+  
+系统时钟源: PLL1P (480MHz)
+AHB总线: 240MHz (DIV = 2)
+APB1总线: 120MHz (DIV = 4)
+APB2总线: 120MHz (DIV = 4)</code></pre>
+
+            <h3>3.3 FDCAN配置 (CAN-FD)</h3>
+            
+            <div class="cubemx-step">
+                <div class="cubemx-num">3</div>
+                <div>
+                    <b>配置FDCAN1</b><br>
+                    Connectivity → FDCAN1
+                </div>
+            </div>
+            <pre><code>; FDCAN1配置参数:
+
+Mode: Normal Mode
+Frame Format: FD mode with BRS
+
+Nominal Prescaler: 4
+Nominal Time Seg1: 13
+Nominal Time Seg2: 2
+Nominal Sync Jump Width: 2
+→ 仲裁段波特率 = 480MHz/4/(13+2+1) = 1Mbps
+
+Data Prescaler: 2
+Data Time Seg1: 7
+Data Time Seg2: 2
+Data Sync Jump Width: 2
+→ 数据段波特率 = 480MHz/2/(7+2+1) = 24Mbps
+
+Transceiver Delay Compensation: Enabled
+TDC Filter: 4
+TDC Offset: 4
+
+Pin配置:
+  - PA11: FDCAN1_RX
+  - PA12: FDCAN1_TX</code></pre>
+
+            <div class="error-box">
+                <div class="error-title">❌ 错误：CAN通信失败，示波器无波形</div>
+                <p>可能原因：波特率计算错误、引脚配置错误、收发器未供电</p>
+            </div>
+            <div class="solution">
+                <div class="error-title" style="color: var(--success);">✅ 排查步骤</div>
+                <p>1. 检查收发器VCC供电(3.3V)<br>
+                2. 用示波器测量TX引脚是否有波形<br>
+                3. 确认总线终端电阻120Ω已连接<br>
+                4. 使用公式验证波特率: BitRate = FDCAN Clock / Prescaler / (Seg1+Seg2+1)</p>
+            </div>
+
+            <h3>3.4 TIM配置 (PWM输出)</h3>
+            
+            <div class="cubemx-step">
+                <div class="cubemx-num">4</div>
+                <div>
+                    <b>配置TIM1 (高级定时器)</b><br>
+                    Timers → TIM1
+                </div>
+            </div>
+            <pre><code>; TIM1配置用于生成3相PWM (6路互补输出)
+
+Clock Source: Internal Clock
+
+Counter Settings:
+  - Prescaler: 0 (不分频)
+  - Counter Period: 9999 (PWM频率 = 480MHz/10000 = 48kHz)
+  - Auto-reload preload: Enable
+
+PWM Generation:
+  - Channel 1: PWM Mode 1 (PE9)
+  - Channel 1N: PWM Mode 1 (PE8)
+  - Channel 2: PWM Mode 1 (PE11)
+  - Channel 2N: PWM Mode 1 (PE10)
+  - Channel 3: PWM Mode 1 (PE13)
+  - Channel 3N: PWM Mode 1 (PE12)
+
+Dead Time Insertion:
+  - Dead Time: 100 (约100ns死区时间)
+
+Break And Dead Time Management:
+  - Automatic Output State: Enable
+  - Off State Selection for Run Mode: Enable
+  - Off State Selection for Idle Mode: Enable</code></pre>
+
+            <h3>3.5 ADC配置 (电流采样)</h3>
+            
+            <div class="cubemx-step">
+                <div class="cubemx-num">5</div>
+                <div>
+                    <b>配置ADC1</b><br>
+                    Analog → ADC1
+                </div>
+            </div>
+            <pre><code>; ADC1配置用于三相电流采样
+
+Clock Prescaler: DIV4 (ADC Clock = 120MHz/4 = 30MHz)
+Resolution: 16 bits
+Scan Conversion Mode: Enabled
+Continuous Conversion Mode: Disabled
+Discontinuous Conversion Mode: Disabled
+DMA Continuous Requests: Enabled
+End Of Conversion Selection: EOC at end of each conversion
+Overrun behaviour: Overrun data preserved
+
+Channels:
+  - Channel 3 (PA6): U相电流采样
+  - Channel 4 (PA7): V相电流采样
+  - Channel 5 (PB0): W相电流采样
+  
+Sampling Time: 6.5 Cycles
+
+DMA Settings:
+  - DMA Request: ADC1
+  - Channel: DMA1_Channel1
+  - Direction: Peripheral to Memory
+  - Mode: Circular
+  - Data Width: Half Word</code></pre>
+
+            <h3>3.6 SPI配置 (编码器接口)</h3>
+            
+            <div class="cubemx-step">
+                <div class="cubemx-num">6</div>
+                <div>
+                    <b>配置SPI1</b><br>
+                    Connectivity → SPI1
+                </div>
+            </div>
+            <pre><code>; SPI1配置用于读取MT6701磁编码器
+
+Mode: Full-Duplex Master
+
+Hardware NSS Signal: Software NSS Management
+
+Frame Format: Motorola
+Data Size: 8 Bits
+First Bit: MSB First
+
+Clock Parameters:
+  - Prescaler: 32 (SPI Clock = 120MHz/32 = 3.75MHz)
+  - Baud Rate: 3.75 MBits/s
+  - Clock Polarity: Low
+  - Clock Phase: 1 Edge
+
+CRC Calculation: Disabled
+
+Pin配置:
+  - PA5: SPI1_SCK
+  - PA6: SPI1_MISO
+  - PA7: SPI1_MOSI
+  - PA4: GPIO_Output (软件片选)</code></pre>
+
+            <h3>3.7 中断优先级配置</h3>
+            <pre><code>; NVIC中断优先级配置 (数字越小优先级越高)
+
+TIM1_UP_TIM10_IRQn:     Preemption=2, Sub=0  ; PWM更新中断 20kHz
+FDCAN1_IT0_IRQn:        Preemption=3, Sub=0  ; CAN接收中断
+FDCAN1_IT1_IRQn:        Preemption=3, Sub=1  ; CAN发送中断
+DMA1_Channel1_IRQn:     Preemption=4, Sub=0  ; ADC DMA中断
+SPI1_IRQn:              Preemption=5, Sub=0  ; SPI中断
+USART1_IRQn:            Preemption=6, Sub=0  ; 调试串口
+SysTick_IRQn:           Preemption=7, Sub=0  ; 系统时钟 1kHz</code></pre>
+
+            <h3>3.8 生成代码</h3>
+            
+            <div class="cubemx-step">
+                <div class="cubemx-num">7</div>
+                <div>
+                    <b>生成工程代码</b><br>
+                    Project Manager → Project
+                </div>
+            </div>
+            <pre><code>Project Name: quadruped_motor_driver
+Project Location: D:/Projects/
+Toolchain / IDE: MDK-ARM V5
+
+Code Generator Settings:
+  ☑ Copy all used libraries into the project folder
+  ☑ Generate peripheral initialization as a pair of '.c/.h' files per peripheral
+  ☐ Keep User Code when re-generating
+  ☑ Delete previously generated files when not re-generated
+  ☐ Set all free pins as analog
+  
+Advanced Settings:
+  Driver Selector: LL (Low Layer)  ; 使用LL库提高效率</code></pre>
+
+            <div class="info-box warning">
+                <b>⚠️ 重要提示</b><br>
+                生成代码前务必检查：<br>
+                1. 所有引脚没有冲突 (显示绿色)<br>
+                2. 时钟配置没有错误提示<br>
+                3. 选择了正确的工具链版本
+            </div>
+        </section>
+
+        <!-- 第四部分：底层代码详解 -->
+        <section class="section" id="part4">
+            <h2>第四部分：底层代码详解</h2>
+            
+            <h3>4.1 工程目录结构</h3>
+            <pre><code>quadruped_motor_driver/
+├── Core/
+│   ├── Inc/
+│   │   ├── main.h
+│   │   ├── stm32h7xx_hal_conf.h
+│   │   ├── stm32h7xx_it.h
+│   │   ├── motor_control.h      ; 电机控制头文件
+│   │   ├── foc.h                ; FOC算法头文件
+│   │   ├── encoder.h            ; 编码器驱动
+│   │   ├── current_sensor.h     ; 电流传感器
+│   │   ├── can_protocol.h       ; CAN通信协议
+│   │   └── pid_controller.h     ; PID控制器
+│   └── Src/
+│       ├── main.c
+│       ├── stm32h7xx_hal_msp.c
+│       ├── stm32h7xx_it.c
+│       ├── motor_control.c      ; 电机控制实现
+│       ├── foc.c                ; FOC算法实现
+│       ├── encoder.c            ; 编码器驱动实现
+│       ├── current_sensor.c     ; 电流传感器实现
+│       ├── can_protocol.c       ; CAN通信实现
+│       └── pid_controller.c     ; PID控制器实现
+├── Drivers/
+│   ├── STM32H7xx_HAL_Driver/
+│   └── CMSIS/
+└── quadruped_motor_driver.ioc</code></pre>
+
+            <h3>4.2 FOC算法核心代码</h3>
+            
+            <h4>4.2.1 Clarke变换 (三相静止坐标系 → 两相静止坐标系)</h4>
+            <pre><code>// foc.c - Clarke变换实现
+#include "foc.h"
+#include <math.h>
+
+// Clarke变换: Iα = Ia, Iβ = (Ia + 2*Ib)/√3
+void clarke_transform(float ia, float ib, float ic, 
+                      float* ialpha, float* ibeta) {
+    // 检查输入电流之和是否为零 (KCL定律)
+    float sum = ia + ib + ic;
+    if (fabs(sum) > 0.1f) {
+        // 错误: 电流传感器校准错误或接线错误
+        Error_Handler(ERROR_CURRENT_SENSOR);
+    }
+    
+    *ialpha = ia;
+    *ibeta = (ia + 2.0f * ib) / 1.73205080757f;  // √3 ≈ 1.732
+}
+
+// 错误处理函数
+void Error_Handler(ErrorCode_t error) {
+    // 关闭所有PWM输出
+    HAL_TIM_PWM_Stop(&htim1, TIM_CHANNEL_1);
+    HAL_TIM_PWM_Stop(&htim1, TIM_CHANNEL_2);
+    HAL_TIM_PWM_Stop(&htim1, TIM_CHANNEL_3);
+    
+    // 设置错误标志
+    g_error_code = error;
+    
+    // 进入安全状态
+    g_motor_state = MOTOR_STATE_ERROR;
+    
+    // 发送错误信息到上位机
+    CAN_SendError(error);
+}</code></pre>
+
+            <div class="error-box">
+                <div class="error-title">❌ 错误：Clarke变换后电流值异常</div>
+                <p>现象：Iα或Iβ数值过大或出现NaN</p>
+            </div>
+            <div class="solution">
+                <div class="error-title" style="color: var(--success);">✅ 排查步骤</div>
+                <p>1. 检查ADC采样值是否在合理范围(0~3.3V)<br>
+                2. 验证电流采样电阻和放大倍数设置<br>
+                3. 检查三相电流接线是否正确<br>
+                4. 确认ADC校准已完成</p>
+            </div>
+
+            <h4>4.2.2 Park变换 (静止坐标系 → 旋转坐标系)</h4>
+            <pre><code>// Park变换: Id = Iα*cos(θ) + Iβ*sin(θ), Iq = -Iα*sin(θ) + Iβ*cos(θ)
+void park_transform(float ialpha, float ibeta, float theta,
+                    float* id, float* iq) {
+    float cos_theta = cosf(theta);
+    float sin_theta = sinf(theta);
+    
+    *id = ialpha * cos_theta + ibeta * sin_theta;
+    *iq = -ialpha * sin_theta + ibeta * cos_theta;
+}
+
+// 反Park变换: Vα = Vd*cos(θ) - Vq*sin(θ), Vβ = Vd*sin(θ) + Vq*cos(θ)
+void inverse_park_transform(float vd, float vq, float theta,
+                            float* valpha, float* vbeta) {
+    float cos_theta = cosf(theta);
+    float sin_theta = sinf(theta);
+    
+    *valpha = vd * cos_theta - vq * sin_theta;
+    *vbeta = vd * sin_theta + vq * cos_theta;
+}</code></pre>
+
+            <h4>4.2.3 SVPWM生成</h4>
+            <pre><code>// SVPWM空间矢量调制
+void svpwm_generate(float valpha, float vbeta, float vdc,
+                    uint16_t* pwm_u, uint16_t* pwm_v, uint16_t* pwm_w) {
+    // 计算扇区
+    float v1 = vbeta;
+    float v2 = 0.86602540378f * valpha - 0.5f * vbeta;  // √3/2
+    float v3 = -0.86602540378f * valpha - 0.5f * vbeta;
+    
+    uint8_t sector = 0;
+    if (v1 > 0) sector |= 1;
+    if (v2 > 0) sector |= 2;
+    if (v3 > 0) sector |= 4;
+    
+    // 计算占空比 (简化版)
+    float x = vbeta;
+    float y = 0.86602540378f * valpha + 0.5f * vbeta;
+    float z = -0.86602540378f * valpha + 0.5f * vbeta;
+    
+    float t1, t2, t0;
+    
+    switch (sector) {
+        case 1:  // 扇区I
+            t1 = z;
+            t2 = y;
+            break;
+        case 2:  // 扇区II
+            t1 = y;
+            t2 = -x;
+            break;
+        // ... 其他扇区
+        default:
+            t1 = 0;
+            t2 = 0;
+            break;
+    }
+    
+    // 限幅
+    if (t1 + t2 > 1.0f) {
+        float scale = 1.0f / (t1 + t2);
+        t1 *= scale;
+        t2 *= scale;
+    }
+    
+    t0 = 1.0f - t1 - t2;  // 零矢量时间
+    
+    // 转换为PWM寄存器值
+    uint16_t period = htim1.Instance->ARR;  // PWM周期值
+    
+    *pwm_u = (uint16_t)((0.5f - t1 - t2 * 0.5f) * period);
+    *pwm_v = (uint16_t)((0.5f + t1 * 0.5f - t2 * 0.5f) * period);
+    *pwm_w = (uint16_t)((0.5f + t1 * 0.5f + t2) * period);
+}</code></pre>
+
+            <h3>4.3 编码器驱动代码</h3>
+            <pre><code>// encoder.c - MT6701磁编码器驱动
+#include "encoder.h"
+
+#define ENCODER_CPR  16384  // 14位分辨率 (2^14)
+#define SPI_TIMEOUT  10     // SPI超时时间(ms)
+
+static float encoder_offset = 0.0f;  // 零点偏移
+static int32_t encoder_turns = 0;     // 转数计数
+static uint16_t last_raw = 0;
+
+// 初始化编码器
+void Encoder_Init(void) {
+    // 拉低片选
+    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_RESET);
+    HAL_Delay(1);
+    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_SET);
+    
+    // 读取当前位置作为零点
+    encoder_offset = Encoder_GetAngle();
+    encoder_turns = 0;
+    last_raw = 0;
+}
+
+// 读取编码器角度 (0~2π rad)
+float Encoder_GetAngle(void) {
+    uint8_t tx_data[2] = {0x00, 0x00};  // 发送空数据触发读取
+    uint8_t rx_data[2] = {0};
+    
+    // 拉低片选
+    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_RESET);
+    
+    // SPI传输
+    HAL_StatusTypeDef status = HAL_SPI_TransmitReceive(&hspi1, tx_data, rx_data, 2, SPI_TIMEOUT);
+    
+    // 拉高片选
+    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_SET);
+    
+    if (status != HAL_OK) {
+        // SPI通信错误
+        Error_Handler(ERROR_ENCODER_SPI);
+        return 0.0f;
+    }
+    
+    // 解析数据 (14位角度值)
+    uint16_t raw_angle = ((rx_data[0] << 8) | rx_data[1]) >> 2;  // 去掉低2位状态位
+    
+    // 检测过零
+    int16_t diff = (int16_t)raw_angle - (int16_t)last_raw;
+    if (diff > ENCODER_CPR / 2) {
+        encoder_turns--;  // 反向过零
+    } else if (diff < -ENCODER_CPR / 2) {
+        encoder_turns++;  // 正向过零
+    }
+    last_raw = raw_angle;
+    
+    // 计算总角度
+    float angle = ((float)raw_angle / ENCODER_CPR) * 2.0f * M_PI;
+    angle += encoder_turns * 2.0f * M_PI;
+    
+    return angle - encoder_offset;
+}</code></pre>
+
+            <div class="error-box">
+                <div class="error-title">❌ 错误：编码器读数跳变</div>
+                <p>现象：角度值突然跳变360度或出现噪声</p>
+            </div>
+            <div class="solution">
+                <div class="error-title" style="color: var(--success);">✅ 排查步骤</div>
+                <p>1. 检查SPI接线是否牢固<br>
+                2. 降低SPI时钟频率(如改为1MHz)<br>
+                3. 检查磁编码器与磁铁的间隙(推荐1-3mm)<br>
+                4. 增加SPI读取的CRC校验</p>
+            </div>
+
+            <h3>4.4 CAN通信协议实现</h3>
+            <pre><code>// can_protocol.c
+#include "can_protocol.h"
+
+#define TX_FIFO_SIZE  32
+#define RX_FIFO_SIZE  32
+
+static FDCAN_TxHeaderTypeDef tx_header;
+static uint8_t tx_data[8];
+
+// 初始化CAN
+void CAN_Init(void) {
+    // 配置过滤器 - 接收所有标准帧
+    FDCAN_FilterTypeDef sFilterConfig;
+    sFilterConfig.IdType = FDCAN_STANDARD_ID;
+    sFilterConfig.FilterIndex = 0;
+    sFilterConfig.FilterType = FDCAN_FILTER_MASK;
+    sFilterConfig.FilterConfig = FDCAN_FILTER_TO_RXFIFO0;
+    sFilterConfig.FilterID1 = 0x000;  // 接收所有ID
+    sFilterConfig.FilterID2 = 0x000;  // 不屏蔽任何位
+    
+    if (HAL_FDCAN_ConfigFilter(&hfdcan1, &sFilterConfig) != HAL_OK) {
+        Error_Handler(ERROR_CAN_FILTER);
+    }
+    
+    // 启动CAN
+    if (HAL_FDCAN_Start(&hfdcan1) != HAL_OK) {
+        Error_Handler(ERROR_CAN_START);
+    }
+    
+    // 使能中断
+    if (HAL_FDCAN_ActivateNotification(&hfdcan1, 
+        FDCAN_IT_RX_FIFO0_NEW_MESSAGE, 0) != HAL_OK) {
+        Error_Handler(ERROR_CAN_INTERRUPT);
+    }
+}
+
+// 发送关节状态
+void CAN_SendJointStatus(uint8_t joint_id, JointStatus_t* status) {
+    tx_header.Identifier = joint_id;
+    tx_header.IdType = FDCAN_STANDARD_ID;
+    tx_header.TxFrameType = FDCAN_DATA_FRAME;
+    tx_header.DataLength = FDCAN_DLC_BYTES_8;
+    tx_header.ErrorStateIndicator = FDCAN_ESI_ACTIVE;
+    tx_header.BitRateSwitch = FDCAN_BRS_ON;  // 使用数据段高速率
+    tx_header.FDFormat = FDCAN_FD_CAN;
+    tx_header.TxEventFifoControl = FDCAN_NO_TX_EVENTS;
+    tx_header.MessageMarker = 0;
+    
+    // 打包数据
+    tx_data[0] = status->position & 0xFF;
+    tx_data[1] = (status->position >> 8) & 0xFF;
+    tx_data[2] = status->velocity & 0xFF;
+    tx_data[3] = (status->velocity >> 8) & 0xFF;
+    tx_data[4] = status->torque & 0xFF;
+    tx_data[5] = (status->torque >> 8) & 0xFF;
+    tx_data[6] = status->temperature;
+    tx_data[7] = status->error_code;
+    
+    // 添加到发送队列
+    if (HAL_FDCAN_AddMessageToTxFifoQ(&hfdcan1, &tx_header, tx_data) != HAL_OK) {
+        // 发送队列满
+        g_can_tx_overflow++;
+    }
+}
+
+// CAN接收中断回调
+void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs) {
+    FDCAN_RxHeaderTypeDef rx_header;
+    uint8_t rx_data[8];
+    
+    if ((RxFifo0ITs & FDCAN_IT_RX_FIFO0_NEW_MESSAGE) != RESET) {
+        // 读取消息
+        if (HAL_FDCAN_GetRxMessage(hfdcan, FDCAN_RX_FIFO0, &rx_header, rx_data) == HAL_OK) {
+            // 解析命令
+            CAN_ParseCommand(rx_header.Identifier, rx_data, rx_header.DataLength);
+        }
+    }
+}
+
+// 解析接收到的命令
+void CAN_ParseCommand(uint32_t can_id, uint8_t* data, uint32_t len) {
+    if (can_id == CAN_ID_COMMAND) {
+        // 解析控制指令
+        JointCommand_t cmd;
+        cmd.position = data[0] | (data[1] << 8);
+        cmd.velocity = data[2] | (data[3] << 8);
+        cmd.torque = data[4] | (data[5] << 8);
+        cmd.kp = data[6];
+        cmd.kd = data[7];
+        
+        // 应用到电机控制
+        Motor_SetCommand(&cmd);
+    }
+}</code></pre>
+
+            <h3>4.5 主控制循环</h3>
+            <pre><code>// main.c - 主控制循环
+#include "main.h"
+
+// 控制周期: 20kHz (50μs)
+#define CONTROL_PERIOD_US  50
+
+volatile uint32_t g_control_count = 0;
+volatile MotorState_t g_motor_state = MOTOR_STATE_IDLE;
+
+int main(void) {
+    // HAL初始化
+    HAL_Init();
+    SystemClock_Config();
+    
+    // 外设初始化 (CubeMX生成)
+    MX_GPIO_Init();
+    MX_FDCAN1_Init();
+    MX_TIM1_Init();
+    MX_ADC1_Init();
+    MX_SPI1_Init();
+    MX_DMA_Init();
+    
+    // 应用层初始化
+    Encoder_Init();
+    CurrentSensor_Init();
+    CAN_Init();
+    MotorControl_Init();
+    
+    // 启动PWM (初始占空比为50%)
+    HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
+    HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_2);
+    HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_3);
+    HAL_TIMEx_PWMN_Start(&htim1, TIM_CHANNEL_1);
+    HAL_TIMEx_PWMN_Start(&htim1, TIM_CHANNEL_2);
+    HAL_TIMEx_PWMN_Start(&htim1, TIM_CHANNEL_3);
+    
+    // 启动ADC DMA
+    HAL_ADC_Start_DMA(&hadc1, (uint32_t*)adc_buffer, 3);
+    
+    // 使能TIM1更新中断 (20kHz)
+    HAL_TIM_Base_Start_IT(&htim1);
+    
+    // 主循环
+    while (1) {
+        // 1kHz任务
+        if (g_control_count % 20 == 0) {
+            // 更新状态机
+            MotorControl_UpdateState();
+            
+            // 发送状态到上位机
+            JointStatus_t status;
+            Motor_GetStatus(&status);
+            CAN_SendJointStatus(MOTOR_ID, &status);
+        }
+        
+        // 100Hz任务
+        if (g_control_count % 200 == 0) {
+            // 温度监控
+            if (Motor_GetTemperature() > 80) {
+                Motor_SetState(MOTOR_STATE_OVERHEAT);
+            }
+        }
+        
+        HAL_Delay(1);
+    }
+}
+
+// TIM1更新中断回调 (20kHz)
+void TIM1_UP_TIM10_IRQHandler(void) {
+    if (__HAL_TIM_GET_FLAG(&htim1, TIM_FLAG_UPDATE)) {
+        __HAL_TIM_CLEAR_IT(&htim1, TIM_IT_UPDATE);
+        
+        g_control_count++;
+        
+        // 读取编码器
+        float theta = Encoder_GetAngle();
+        
+        // 读取电流
+        float ia = CurrentSensor_GetPhaseU();
+        float ib = CurrentSensor_GetPhaseV();
+        float ic = CurrentSensor_GetPhaseW();
+        
+        // FOC控制
+        float vd, vq;
+        FOC_Controller(theta, ia, ib, ic, &vd, &vq);
+        
+        // SVPWM生成
+        uint16_t pwm_u, pwm_v, pwm_w;
+        svpwm_generate(vd, vq, VDC_VOLTAGE, &pwm_u, &pwm_v, &pwm_w);
+        
+        // 更新PWM占空比
+        __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1, pwm_u);
+        __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_2, pwm_v);
+        __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_3, pwm_w);
+    }
+}</code></pre>
+        </section>
+
+        <!-- 第五部分：ROS2导航配置 -->
+        <section class="section" id="part5">
+            <h2>第五部分：ROS2导航配置详解</h2>
+            
+            <h3>5.1 功能包创建</h3>
+            <pre><code># 创建工作空间
+mkdir -p ~/quadruped_ws/src
+cd ~/quadruped_ws/src
+
+# 创建功能包
+colcon build --packages-select quadruped_navigation
+
+# 创建导航功能包
+ros2 pkg create quadruped_navigation \
+    --build-type ament_cmake \
+    --dependencies rclcpp nav2_bringup slam_toolbox</code></pre>
+
+            <h3>5.2 Nav2参数配置</h3>
+            
+            <h4>5.2.1 导航参数文件 (nav2_params.yaml)</h4>
+            <pre><code># quadruped_navigation/config/nav2_params.yaml
+
+amcl:
+  ros__parameters:
+    use_sim_time: False
+    alpha1: 0.2                    # 旋转噪声系数
+    alpha2: 0.2                    # 平移-旋转噪声
+    alpha3: 0.2                    # 平移噪声
+    alpha4: 0.2                    # 旋转-平移噪声
+    alpha5: 0.2                    # 平移噪声2
+    base_frame_id: "base_link"
+    beam_skip_distance: 0.5
+    beam_skip_error_threshold: 0.9
+    beam_skip_threshold: 0.3
+    do_beamskip: false
+    global_frame_id: "map"
+    lambda_short: 0.1
+    laser_likelihood_max_dist: 2.0
+    laser_max_range: 12.0          # 激光雷达最大范围
+    laser_min_range: 0.15          # 激光雷达最小范围
+    laser_model_type: "likelihood_field"
+    max_beams: 60
+    max_particles: 2000            # 最大粒子数
+    min_particles: 500             # 最小粒子数
+    odom_frame_id: "odom"
+    pf_err: 0.05
+    pf_z: 0.99
+    recovery_alpha_fast: 0.0
+    recovery_alpha_slow: 0.0
+    resample_interval: 1
+    robot_model_type: "nav2_amcl::DifferentialMotionModel"
+    save_pose_rate: 0.5
+    sigma_hit: 0.2
+    tf_broadcast: true
+    transform_tolerance: 1.0
+    update_min_a: 0.2
+    update_min_d: 0.25
+    z_hit: 0.5
+    z_max: 0.05
+    z_rand: 0.5
+    z_short: 0.05
+
+bt_navigator:
+  ros__parameters:
+    use_sim_time: False
+    global_frame: map
+    robot_base_frame: base_link
+    odom_topic: /odom
+    bt_loop_duration: 10
+    default_server_timeout: 20
+    # 行为树XML文件路径
+    default_nav_to_pose_bt_xml: "$(find quadruped_navigation)/behavior_trees/navigate_to_pose_w_replanning_and_recovery.xml"
+    plugin_lib_names:
+      - nav2_compute_path_to_pose_action_bt_node
+      - nav2_follow_path_action_bt_node
+      - nav2_back_up_action_bt_node
+      - nav2_spin_action_bt_node
+      - nav2_wait_action_bt_node
+      - nav2_clear_costmap_service_bt_node
+      - nav2_is_stuck_condition_bt_node
+      - nav2_goal_reached_condition_bt_node
+      - nav2_initial_pose_received_condition_bt_node
+      - nav2_reinitialize_global_localization_service_bt_node
+      - nav2_rate_controller_bt_node
+      - nav2_distance_controller_bt_node
+      - nav2_speed_controller_bt_node
+      - nav2_truncate_path_action_bt_node
+      - nav2_goal_updater_node_bt_node
+      - nav2_recovery_node_bt_node
+      - nav2_pipeline_sequence_bt_node
+      - nav2_round_robin_node_bt_node
+      - nav2_transform_available_condition_bt_node
+      - nav2_time_expired_condition_bt_node
+      - nav2_path_expiring_timer_condition
+
+controller_server:
+  ros__parameters:
+    use_sim_time: False
+    controller_frequency: 20.0           # 控制器更新频率(Hz)
+    min_x_velocity_threshold: 0.001
+    min_y_velocity_threshold: 0.5
+    min_theta_velocity_threshold: 0.001
+    failure_tolerance: 0.3
+    progress_checker_plugin: "progress_checker"
+    goal_checker_plugins: ["general_goal_checker"]
+    controller_plugins: ["FollowPath"]
+    
+    # 进度检查器
+    progress_checker:
+      plugin: "nav2_controller::SimpleProgressChecker"
+      required_movement_radius: 0.5
+      movement_time_allowance: 10.0
+    
+    # 目标检查器
+    general_goal_checker:
+      stateful: True
+      plugin: "nav2_controller::SimpleGoalChecker"
+      xy_goal_tolerance: 0.15            # 位置容差(m)
+      yaw_goal_tolerance: 0.25           # 角度容差(rad)
+    
+    # DWB局部路径规划器
+    FollowPath:
+      plugin: "dwb_core::DWBLocalPlanner"
+      debug_trajectory_details: True
+      min_vel_x: -0.5                    # 最小前进速度
+      min_vel_y: 0.0
+      max_vel_x: 0.8                     # 最大前进速度
+      max_vel_y: 0.0
+      max_vel_theta: 1.0                 # 最大旋转速度
+      min_speed_xy: 0.0
+      max_speed_xy: 0.8
+      min_speed_theta: 0.0
+      acc_lim_x: 2.5                     # X方向加速度限制
+      acc_lim_y: 0.0
+      acc_lim_theta: 3.2                 # 旋转加速度限制
+      decel_lim_x: -2.5
+      decel_lim_y: 0.0
+      decel_lim_theta: -3.2
+      vx_samples: 20                     # X方向速度采样数
+      vy_samples: 0
+      vtheta_samples: 20                 # 旋转速度采样数
+      sim_time: 1.5                      # 前向仿真时间
+      linear_granularity: 0.05
+      angular_granularity: 0.025
+      transform_tolerance: 0.2
+      xy_goal_tolerance: 0.15
+      trans_stopped_velocity: 0.25
+      short_circuit_trajectory_evaluation: True
+      stateful: True
+      critics: ["RotateToGoal", "Oscillation", "BaseObstacle", "GoalAlign", "PathAlign", "PathDist", "GoalDist"]
+      BaseObstacle.scale: 0.02
+      PathAlign.scale: 0.0
+      PathAlign.forward_point_distance: 0.1
+      GoalAlign.scale: 0.0
+      GoalAlign.forward_point_distance: 0.1
+      PathDist.scale: 32.0
+      GoalDist.scale: 24.0
+      RotateToGoal.scale: 32.0
+      RotateToGoal.slowing_factor: 5.0
+      RotateToGoal.lookahead_time: -1.0
+
+planner_server:
+  ros__parameters:
+    expected_planner_frequency: 20.0
+    use_sim_time: False
+    planner_plugins: ["GridBased"]
+    GridBased:
+      plugin: "nav2_navfn_planner/NavfnPlanner"
+      tolerance: 0.5                     # 目标容差
+      use_astar: false                   # 使用Dijkstra
+      allow_unknown: true
+
+recoveries_server:
+  ros__parameters:
+    costmap_topic: local_costmap/costmap_raw
+    footprint_topic: local_costmap/published_footprint
+    cycle_frequency: 10.0
+    recovery_plugins: ["spin", "backup", "wait"]
+    spin:
+      plugin: "nav2_recoveries/Spin"
+    backup:
+      plugin: "nav2_recoveries/BackUp"
+    wait:
+      plugin: "nav2_recoveries/Wait"
+    global_frame: odom
+    robot_base_frame: base_link
+    transform_timeout: 0.1
+    use_sim_time: False
+    simulate_ahead_time: 2.0
+    max_rotational_vel: 1.0
+    min_rotational_vel: 0.4
+    rotational_acc_lim: 3.2
+
+local_costmap:
+  local_costmap:
+    ros__parameters:
+      update_frequency: 5.0              # 更新频率(Hz)
+      publish_frequency: 2.0
+      global_frame: odom
+      robot_base_frame: base_link
+      use_sim_time: False
+      rolling_window: true               # 滚动窗口模式
+      width: 3                           # 地图宽度(m)
+      height: 3                          # 地图高度(m)
+      resolution: 0.05                   # 分辨率(m/pixel)
+      robot_radius: 0.25                 # 机器人半径(m)
+      plugins: ["voxel_layer", "inflation_layer"]
+      inflation_layer:
+        plugin: "nav2_costmap_2d::InflationLayer"
+        cost_scaling_factor: 3.0         # 代价缩放因子
+        inflation_radius: 0.55           # 膨胀半径(m)
+      voxel_layer:
+        plugin: "nav2_costmap_2d::VoxelLayer"
+        enabled: True
+        origin_z: 0.0
+        z_resolution: 0.05
+        z_voxels: 16
+        max_obstacle_height: 2.0
+        mark_threshold: 0
+        observation_sources: scan
+        scan:
+          topic: /scan
+          data_type: "LaserScan"
+          clearing: True
+          marking: True
+          inf_is_valid: false
+      static_layer:
+        map_subscribe_transient_local: True
+      always_send_full_costmap: True
+
+global_costmap:
+  global_costmap:
+    ros__parameters:
+      update_frequency: 1.0
+      publish_frequency: 1.0
+      global_frame: map
+      robot_base_frame: base_link
+      use_sim_time: False
+      robot_radius: 0.25
+      resolution: 0.05
+      track_unknown_space: true
+      plugins: ["static_layer", "obstacle_layer", "inflation_layer"]
+      obstacle_layer:
+        plugin: "nav2_costmap_2d::ObstacleLayer"
+        enabled: True
+        observation_sources: scan
+        scan:
+          topic: /scan
+          data_type: "LaserScan"
+          clearing: True
+          marking: True
+          inf_is_valid: false
+      static_layer:
+        plugin: "nav2_costmap_2d::StaticLayer"
+        map_subscribe_transient_local: True
+      inflation_layer:
+        plugin: "nav2_costmap_2d::InflationLayer"
+        cost_scaling_factor: 3.0
+        inflation_radius: 0.55</code></pre>
+
+            <div class="error-box">
+                <div class="error-title">❌ 错误：Nav2启动失败，提示参数错误</div>
+                <p>现象：ros2 launch时报错，某些参数无法识别</p>
+            </div>
+            <div class="solution">
+                <div class="error-title" style="color: var(--success);">✅ 解决方案</div>
+                <p>1. 检查ROS2版本与Nav2版本匹配<br>
+                2. 使用ros2 param dump检查参数是否正确加载<br>
+                3. 查看具体错误节点的日志<br>
+                4. 确认YAML缩进正确(使用空格而非Tab)</p>
+            </div>
+
+            <h3>5.3 SLAM配置</h3>
+            
+            <h4>5.3.1 SLAM Toolbox参数 (slam_params.yaml)</h4>
+            <pre><code># quadruped_navigation/config/slam_params.yaml
+
+slam_toolbox:
+  ros__parameters:
+    # 基础设置
+    solver_plugin: solver_plugins::CeresSolver
+    ceres_linear_solver: SPARSE_NORMAL_CHOLESKY
+    ceres_preconditioner: SCHUR_JACOBI
+    ceres_trust_strategy: LEVENBERG_MARQUARDT
+    ceres_dogleg_type: TRADITIONAL_DOGLEG
+    ceres_loss_function: None
+
+    # 里程计设置
+    odom_frame: odom
+    map_frame: map
+    base_frame: base_link
+    scan_topic: /scan
+    mode: mapping  # mapping/localization
+
+    # 地图设置
+    debug_logging: false
+    throttle_scans: 1
+    transform_publish_period: 0.02  # 50Hz
+    map_update_interval: 5.0        # 地图更新间隔(s)
+    resolution: 0.05                # 地图分辨率(m)
+    max_laser_range: 12.0           # 激光最大范围(m)
+    minimum_time_interval: 0.5
+    transform_timeout: 0.2
+    tf_buffer_duration: 14400.0
+    stack_size_to_use: 40000000
+    enable_interactive_mode: true
+
+    # 扫描匹配设置
+    use_scan_matching: true
+    use_scan_barycenter: true
+    minimum_travel_distance: 0.5    # 最小移动距离触发扫描
+    minimum_travel_heading: 0.5     # 最小旋转角度触发扫描
+    scan_buffer_size: 10
+    scan_buffer_maximum_scan_distance: 10.0
+    link_match_minimum_response_fine: 0.1
+    link_scan_maximum_distance: 1.5
+    loop_search_maximum_distance: 3.0
+    do_loop_closing: true
+    loop_match_minimum_chain_size: 10
+    loop_match_maximum_variance_coarse: 3.0
+    loop_match_minimum_response_coarse: 0.35
+    loop_match_minimum_response_fine: 0.45
+
+    # 相关扫描匹配器设置
+    correlation_search_space_dimension: 0.5
+    correlation_search_space_resolution: 0.01
+    correlation_search_space_smear_deviation: 0.1
+    loop_search_space_dimension: 8.0
+    loop_search_space_resolution: 0.05
+    loop_search_space_smear_deviation: 0.03
+
+    # 扫描匹配器设置
+    distance_variance_penalty: 0.5
+    angle_variance_penalty: 1.0
+    fine_search_angle_offset: 0.00349
+    coarse_search_angle_offset: 0.349
+    coarse_angle_resolution: 0.0349
+    minimum_angle_penalty: 0.9
+    minimum_distance_penalty: 0.5
+    use_response_expansion: true</code></pre>
+
+            <h3>5.4 启动文件</h3>
+            
+            <h4>5.4.1 导航启动文件 (navigation.launch.py)</h4>
+            <pre><code># quadruped_navigation/launch/navigation.launch.py
+
+import os
+from ament_index_python.packages import get_package_share_directory
+from launch import LaunchDescription
+from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
+from launch.launch_description_sources import PythonLaunchDescriptionSource
+from launch.substitutions import LaunchConfiguration
+from launch_ros.actions import Node
+
+def generate_launch_description():
+    # 获取包路径
+    pkg_dir = get_package_share_directory('quadruped_navigation')
+    
+    # 参数文件路径
+    nav2_params = os.path.join(pkg_dir, 'config', 'nav2_params.yaml')
+    slam_params = os.path.join(pkg_dir, 'config', 'slam_params.yaml')
+    map_file = os.path.join(pkg_dir, 'maps', 'office_map.yaml')
+    
+    # 启动参数
+    use_sim_time = LaunchConfiguration('use_sim_time', default='false')
+    slam = LaunchConfiguration('slam', default='true')
+    map_file_arg = LaunchConfiguration('map', default=map_file)
+    
+    return LaunchDescription([
+        # 声明启动参数
+        DeclareLaunchArgument(
+            'use_sim_time',
+            default_value='false',
+            description='Use simulation (Gazebo) clock if true'),
+        
+        DeclareLaunchArgument(
+            'slam',
+            default_value='true',
+            description='Whether to run SLAM'),
+        
+        DeclareLaunchArgument(
+            'map',
+            default_value=map_file,
+            description='Full path to map yaml file'),
+        
+        # 启动SLAM (如果启用)
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(
+                os.path.join(pkg_dir, 'launch', 'slam.launch.py')),
+            condition=IfCondition(slam),
+            launch_arguments={'use_sim_time': use_sim_time}.items()
+        ),
+        
+        # 启动Nav2 Bringup
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(
+                os.path.join(get_package_share_directory('nav2_bringup'),
+                            'launch', 'bringup_launch.py')),
+            launch_arguments={
+                'use_sim_time': use_sim_time,
+                'params_file': nav2_params,
+                'map': map_file_arg,
+                'slam': 'false'  # SLAM单独启动
+            }.items()
+        ),
+        
+        # 启动RViz2
+        Node(
+            package='rviz2',
+            executable='rviz2',
+            name='rviz2',
+            arguments=['-d', os.path.join(pkg_dir, 'rviz', 'nav2.rviz')],
+            parameters=[{'use_sim_time': use_sim_time}],
+            output='screen'
+        ),
+    ])</code></pre>
+
+            <h3>5.5 导航调优指南</h3>
+            
+            <h4>5.5.1 参数调优流程</h4>
+            <pre><code># 1. 检查TF树是否完整
+ros2 run tf2_tools view_frames.py
+
+# 2. 检查激光雷达数据
+ros2 topic echo /scan --once
+
+# 3. 检查里程计数据
+ros2 topic echo /odom --once
+
+# 4. 实时监控导航状态
+ros2 topic echo /navigate_to_pose/_action/feedback
+
+# 5. 调整局部路径规划器参数
+# 如果机器人转弯过于激进，减小max_vel_theta
+# 如果机器人无法通过狭窄通道，减小robot_radius</code></pre>
+
+            <table>
+                <tr><th>问题现象</th><th>调整参数</th><th>建议值</th></tr>
+                <tr><td>机器人原地打转</td><td>yaw_goal_tolerance</td><td>增大到0.5</td></tr>
+                <tr><td>路径规划失败</td><td>inflation_radius</td><td>减小到0.3</td></tr>
+                <tr><td>避障过于保守</td><td>cost_scaling_factor</td><td>增大到5.0</td></tr>
+                <tr><td>速度波动大</td><td>vx_samples</td><td>增大到30</td></tr>
+                <tr><td>定位漂移</td><td>min_particles</td><td>增大到1000</td></tr>
+            </table>
+        </section>
+
+        <!-- 第六部分：故障排查手册 -->
+        <section class="section" id="part6">
+            <h2>第六部分：故障排查手册</h2>
+            
+            <h3>6.1 硬件故障排查</h3>
+            
+            <h4>6.1.1 CAN通信故障</h4>
+            <table>
+                <tr><th>现象</th><th>可能原因</th><th>排查步骤</th><th>解决方案</th></tr>
+                <tr>
+                    <td>CAN无数据</td>
+                    <td>接线错误</td>
+                    <td>1. 检查CAN_H/CAN_L<br>2. 测量电阻</td>
+                    <td>正确接线，添加120Ω终端电阻</td>
+                </tr>
+                <tr>
+                    <td>数据错乱</td>
+                    <td>波特率不匹配</td>
+                    <td>1. 检查时钟配置<br>2. 计算波特率</td>
+                    <td>统一波特率(推荐1Mbps)</td>
+                </tr>
+                <tr>
+                    <td>偶发断线</td>
+                    <td>接触不良</td>
+                    <td>1. 检查连接器<br>2. 测量通断</td>
+                    <td>更换连接器，加固接线</td>
+                </tr>
+            </table>
+
+            <h4>6.1.2 电机故障</h4>
+            <table>
+                <tr><th>现象</th><th>可能原因</th><th>排查步骤</th><th>解决方案</th></tr>
+                <tr>
+                    <td>电机不转</td>
+                    <td>驱动器故障</td>
+                    <td>1. 检查PWM输出<br>2. 测量相电压</td>
+                    <td>更换驱动器，检查MOS管</td>
+                </tr>
+                <tr>
+                    <td>电机抖动</td>
+                    <td>编码器故障</td>
+                    <td>1. 读取编码器值<br>2. 检查SPI波形</td>
+                    <td>重新校准编码器，检查磁铁</td>
+                </tr>
+                <tr>
+                    <td>电机过热</td>
+                    <td>电流过大</td>
+                    <td>1. 检查电流采样<br>2. 降低负载</td>
+                    <td>调整PID参数，增加散热</td>
+                </tr>
+            </table>
+
+            <h3>6.2 软件故障排查</h3>
+            
+            <h4>6.2.1 编译错误</h4>
+            <pre><code># 错误1: undefined reference to `sinf'
+# 原因: 未链接数学库
+# 解决: 在CMakeLists.txt中添加
+target_link_libraries(your_target m)
+
+# 错误2: multiple definition of `g_variable'
+# 原因: 全局变量在头文件中定义
+# 解决: 头文件中使用extern声明，在.c文件中定义
+
+# 错误3: implicit declaration of function
+# 原因: 头文件未包含或函数名拼写错误
+# 解决: 检查#include和函数名拼写</code></pre>
+
+            <h4>6.2.2 运行时错误</h4>
+            <pre><code># 错误1: HardFault_Handler
+# 原因: 空指针访问、数组越界、栈溢出
+# 排查:
+  1. 查看LR寄存器确定错误位置
+  2. 检查最近修改的代码
+  3. 增加栈大小(Stack_Size)
+
+# 错误2: 控制周期不稳定
+# 原因: 中断优先级错误、DMA冲突
+# 排查:
+  1. 用示波器测量PWM频率
+  2. 检查中断优先级配置
+  3. 禁用不必要的DMA请求
+
+# 错误3: CAN发送失败
+# 原因: 发送队列满、总线错误
+# 排查:
+  1. 检查g_can_tx_overflow计数
+  2. 测量CAN总线波形
+  3. 检查终端电阻</code></pre>
+
+            <h3>6.3 ROS2故障排查</h3>
+            
+            <h4>6.3.1 导航故障</h4>
+            <table>
+                <tr><th>现象</th><th>排查命令</th><th>解决方案</th></tr>
+                <tr>
+                    <td>机器人不移动</td>
+                    <td>ros2 topic echo /cmd_vel</td>
+                    <td>检查速度指令是否发布</td>
+                </tr>
+                <tr>
+                    <td>定位丢失</td>
+                    <td>ros2 topic echo /amcl_pose</td>
+                    <td>重启AMCL，检查里程计</td>
+                </tr>
+                <tr>
+                    <td>路径规划失败</td>
+                    <td>ros2 service call /plan_path</td>
+                    <td>检查代价地图，降低膨胀半径</td>
+                </tr>
+                <tr>
+                    <td>TF转换失败</td>
+                    <td>ros2 run tf2_tools view_frames</td>
+                    <td>检查坐标系发布，统一时间戳</td>
+                </tr>
+            </table>
+
+            <h3>6.4 调试工具使用</h3>
+            
+            <h4>6.4.1 STM32调试</h4>
+            <pre><code># 使用ST-Link调试
+openocd -f interface/stlink.cfg -f target/stm32h7x.cfg
+
+# GDB连接
+target remote localhost:3333
+monitor reset halt
+load
+break main
+continue
+
+# 查看寄存器
+info registers
+
+# 查看变量
+print g_motor_state
+
+# 内存查看
+x/10wx 0x20000000</code></pre>
+
+            <h4>6.4.2 ROS2调试</h4>
+            <pre><code># 查看节点图
+ros2 run rqt_graph rqt_graph
+
+# 查看TF树
+ros2 run tf2_tools view_frames.py
+
+# 记录数据包
+ros2 bag record -o test /scan /odom /tf
+
+# 回放数据包
+ros2 bag play test</code></pre>
+
+            <div class="info-box danger">
+                <b>⚠️ 安全警告</b><br>
+                调试电机时务必注意：<br>
+                1. 使用限流电源，防止过流<br>
+                2. 固定好机器人，防止突然运动<br>
+                3. 准备好急停按钮<br>
+                4. 调试FOC时先使用开环模式验证接线
+            </div>
+        </section>
+
+        <div style="text-align: center; padding: 2rem; border-top: 1px solid var(--border); margin-top: 2rem;">
+            <p style="color: var(--text2);">ATK-DLRK3588 + STM32H7 四足机器狗开发教程</p>
+            <p style="color: var(--text2); font-size: 0.9rem;">版本: v2.0 | 更新日期: 2026-03-24</p>
+        </div>
+    </main>
+
+    <script>
+        // 侧边栏导航高亮
+        const sections = document.querySelectorAll('.section[id]');
+        const navLinks = document.querySelectorAll('.sidebar-menu a');
+
+        window.addEventListener('scroll', () => {
+            let current = '';
+            sections.forEach(section => {
+                const sectionTop = section.offsetTop;
+                if (scrollY >= sectionTop - 100) {
+                    current = section.getAttribute('id');
+                }
+            });
+
+            navLinks.forEach(link => {
+                link.classList.remove('active');
+                if (link.getAttribute('href') === '#' + current) {
+                    link.classList.add('active');
+                }
+            });
+        });
+
+        // 平滑滚动
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                const target = document.querySelector(this.getAttribute('href'));
+                if (target) {
+                    target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+            });
+        });
+    </script>
+</body>
+</html>
